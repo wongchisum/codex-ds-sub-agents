@@ -1,0 +1,16 @@
+# Local subagent test workspaces. Never commit their contents.
+/worktree/
+/.deepseek-delegations/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local configuration and secrets
+.env
+.env.*
+*.local
+
+# macOS
+.DS_Store

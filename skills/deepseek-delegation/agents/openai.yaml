@@ -1,0 +1,4 @@
+interface:
+  display_name: "DeepSeek Delegation"
+  short_description: "Parallel mailbox pool for DeepSeek workers"
+  default_prompt: "Split bounded work into a task pool and delegate it to parallel DeepSeek workers."

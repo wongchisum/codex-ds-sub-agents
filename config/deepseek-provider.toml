@@ -1,0 +1,14 @@
+[model_providers.deepseek]
+name = "DeepSeek"
+base_url = "https://api.deepseek.com"
+wire_api = "responses"
+supports_websockets = false
+request_max_retries = 2
+stream_max_retries = 2
+stream_idle_timeout_ms = 300000
+
+[model_providers.deepseek.auth]
+command = "/usr/bin/security"
+args = ["find-generic-password", "-a", "codex", "-s", "deepseek-api-key", "-w"]
+timeout_ms = 5000
+refresh_interval_ms = 0

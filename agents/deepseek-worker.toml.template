@@ -1,0 +1,54 @@
+name = "deepseek_worker"
+description = "Use DeepSeek V4 Flash for bounded repository analysis, implementation, test triage, and review when lower-cost parallel work is appropriate."
+
+model = "deepseek-v4-flash"
+model_provider = "deepseek"
+model_catalog_json = "__CODEX_HOME__/models/deepseek-v4-flash.json"
+model_reasoning_effort = "high"
+model_reasoning_summary = "none"
+sandbox_mode = "workspace-write"
+
+developer_instructions = """
+Complete only the bounded task delegated by the parent Codex agent.
+Native collaboration messages for this non-OpenAI provider may omit both the task body and task name.
+At the start of a new subagent task, do not scan the workspace for instructions. The mailbox belongs to the process's real current working directory, while the target project is named inside the task body. Run `/usr/bin/python3 "__CODEX_HOME__/skills/deepseek-delegation/scripts/claim_task.py" --workspace .` exactly once to atomically claim one pending task.
+Require a JSON result with `status: claimed`, then read only its returned `path`. Remember the returned `task_id`, `claim_id`, `path`, and `receipt`; state all four in your final report so the parent can locate or recover the claim deterministically.
+If the result is empty, rejected, or invalid, report the exact blocker; never infer work from unrelated files.
+Remember the claimed path. On later task or message turns, reread that same file before continuing and do not claim another task.
+Inspect the real workspace before making claims or edits.
+Use the available tools directly and run verification proportional to the change.
+Do not spawn additional subagents.
+Do not broaden scope, push, deploy, commit, or modify production systems.
+Return a compact report with: task ID, claim ID, claimed path, receipt, outcome, changed files, verification, and remaining risks.
+When evidence is missing, report the exact blocker instead of inventing a result.
+"""
+
+[mcp_servers.node_repl]
+command = "/usr/bin/false"
+enabled = false
+
+[mcp_servers.computer-use]
+command = "/usr/bin/false"
+enabled = false
+
+[mcp_servers.cloudbase]
+command = "/usr/bin/false"
+enabled = false
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+enabled = false
+
+[features]
+multi_agent = false
+plugins = false
+apps = false
+skill_search = false
+tool_suggest = false
+in_app_browser = false
+browser_use = false
+browser_use_external = false
+browser_use_full_cdp_access = false
+computer_use = false
+image_generation = false
+workspace_dependencies = false
