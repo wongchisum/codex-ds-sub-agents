@@ -188,3 +188,6 @@ The uninstaller removes only agent, model, and skill files that exactly match th
 - The repository does not yet include an open-source license. Default copyright restrictions apply until one is added.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the mailbox protocol and recovery flow.
+
+## Links
+https://linux.do/
