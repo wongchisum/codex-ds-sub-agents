@@ -188,3 +188,6 @@ python3 scripts/uninstall.py
 - 仓库尚未选择开源许可证。在许可证加入前，默认版权规则仍然适用。
 
 协议与恢复流程见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+
+## Links
+[Linux Do](https://linux.do/)
