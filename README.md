@@ -1,190 +1,149 @@
-# Codex DeepSeek Subagents
+# Codex Custom Subagents
 
-[English](README_EN.md) · [架构说明](ARCHITECTURE.md)
+[English](README_EN.md) · [安装](docs/INSTALLATION.md) · [架构](docs/ARCHITECTURE.md) · [模型适配](docs/MODEL_ADAPTERS.md) · [实现原理](docs/IMPLEMENTATION.md)
 
-这个项目让 Codex Desktop 把 `deepseek-v4-flash` 用作子智能体模型，并允许父任务同时下发多个相互独立的工作项。
+`codex-custom-subagents` 让 Codex Desktop 使用自定义供应商、模型地址和协议创建 sub-agent。配置可以列出多个候选模型，但每一批 sub-agent 只使用一个模型；当前模型发生符合条件的传输故障后，父任务可按配置切换到下一个 fallback。
 
-> 这是第三方集成，不是 OpenAI 或 DeepSeek 发布的 Codex 插件。仓库当前没有 `.codex-plugin/plugin.json`；安装脚本写入的是 Codex 的 agent、model catalog、model provider 和 skill 配置。
+项目以 Codex 插件形式提供 `deepseek-delegation` skill，并附带安装器、模型目录生成器、协议适配器，以及 macOS LaunchAgent / Windows Task Scheduler 服务管理工具。
 
-![Codex Desktop 中的 DeepSeek 子智能体任务](assets/codex-deepseek-subagents.png)
+![Codex Desktop 中的自定义子智能体任务](assets/codex-custom-subagents.png)
 
-上图来自一次本地测试。右侧是 Codex Desktop 的子智能体任务列表，其中多个 DeepSeek worker 并行执行审查、修复和协议验证。任务名称、数量和界面会随实际 Prompt 与 Codex 版本变化。
+截图来自 DeepSeek worker 的本地测试。项目也支持 Claude、Gemini、DeepSeek Anthropic 端点，以及其他兼容 Anthropic Messages 的网关。
 
-## 工作方式
+## 核心能力
 
-在当前测试环境中，Codex 创建自定义 provider 子智能体时，传给 DeepSeek 的原生父子消息可能缺少完整任务正文或任务名。本项目用工作区文件传递任务正文，同时保留 Codex Desktop 的子任务列表、工具执行和结果回传：
+- 自定义 `base_url`、远端模型名、认证引用、协议、上下文声明和输出上限。
+- 一个 primary 加有序 fallbacks；同一运行批次不混用模型。
+- 原生 Codex Responses provider，或通过本机适配器接入 Anthropic Messages。
+- macOS Keychain、Windows Credential Manager、Bearer 环境变量和自定义 Header 环境变量认证；manifest 禁止内联 Key。
+- 原子任务信箱，解决部分自定义 provider 无法可靠收到原生任务正文的问题。
+- 安装所有权登记、内容摘要校验、可预览卸载和旧版 DeepSeek 安装兼容。
 
-```text
-父智能体拆分独立任务
-  → 写入 .deepseek-delegations/pending/
-  → 创建一个或多个 deepseek_worker
-  → 每个 worker 原子领取一个任务到 claimed/
-  → worker 执行任务并返回 task_id、claim_id、路径和 receipt
-  → 父智能体检查文件与测试结果
-```
+## 快速开始
 
-领取脚本用同一文件系统内的原子 rename 避免两个 worker 执行同一任务。receipt 用于定位已经领取但未成功回传结果的任务；`recover` 不会自行判断 worker 是否已经停止，恢复前仍需父智能体确认。
-
-## 已验证范围
-
-- macOS
-- Codex Desktop 与 Codex CLI `0.146.0-alpha.3.1`
-- Python 3.9 和 3.13；CI 使用 Python 3.11
-- DeepSeek 模型 `deepseek-v4-flash`
-- DeepSeek Responses API base URL `https://api.deepseek.com`
-- macOS Keychain 中的 `deepseek-api-key`
-
-`models/deepseek-v4-flash.json` 当前声明 `minimal_client_version` 为 `0.146.0`。这只是本项目的客户端版本门槛，不代表已经逐个验证所有更早或更晚的 Codex 版本。
-
-DeepSeek 官方文档目前列出 `deepseek-v4-flash`，模型版本为 `DeepSeek-V4-Flash-0731`，并说明 Responses API 当前支持该模型：
-
-- [DeepSeek API 快速开始](https://api-docs.deepseek.com/zh-cn/)
-- [DeepSeek Responses API 兼容性](https://api-docs.deepseek.com/zh-cn/guides/responses_api/)
-
-## 安装
-
-### 前置条件
-
-- macOS
-- 已安装并登录 Codex Desktop
-- `git` 与 `python3`
-- 可用的 DeepSeek API Key
-
-### 克隆并安装
+要求：macOS 或 Windows、已登录的 Codex Desktop、Python 3.9+、`git`，以及目标模型凭证。Windows 代码路径已有模拟测试，真机验收步骤见 [Windows 测试清单](docs/WINDOWS_TESTING.md)。
 
 ```bash
-git clone https://github.com/wongchisum/codex-ds-sub-agents.git
-cd codex-ds-sub-agents
-python3 scripts/install.py
+git clone https://github.com/wongchisum/codex-custom-subagents.git
+cd codex-custom-subagents
+
+# 查看协议；Provider 按协议配置，不按模型类型配置
+python3 scripts/configure.py --list-protocols
+
+# 兼容示例：安装 DeepSeek V4 Flash，并自动运行 doctor
+python3 scripts/configure.py --profile deepseek-anthropic
 ```
 
-`install.py` 会：
-
-- 安装 `deepseek_worker` 到 `~/.codex/agents/`
-- 安装模型目录到 `~/.codex/models/`
-- 安装 `deepseek-delegation` skill 到 `~/.codex/skills/`
-- 在缺少配置时向 `~/.codex/config.toml` 追加 DeepSeek provider
-- 覆盖本项目管理的已修改文件前创建带时间戳的备份
-
-安装器不会改动仓库的 `worktree/`。升级 skill 时，它只清理旧安装清单中记录、已从新版本移除且内容未被用户修改的文件。
-
-### 保存 API Key
-
-不要把 Key 写进 README、Prompt、Git 配置或任务文件。在终端运行：
+`configure.py` 会把选中的 manifest 保存到
+`~/.codex/custom-subagents/manifests/`，检查凭证引用，并在凭证齐全后依次运行安装和
+doctor。`--profile` 仅保留为示例和旧 Prompt 兼容入口；新配置使用 schema v2 manifest，
+Provider 只声明 `openai_responses` 或 `anthropic_messages`。首次运行如果缺少凭证，脚本会
+在安装前以 exit 3 停止并打印当前操作系统的交互式凭证命令。
 
 ```bash
 /usr/bin/security add-generic-password -U -a codex -s deepseek-api-key -w
 ```
 
-`-w` 放在命令末尾且不带值时，macOS `security` 会交互式读取密码，Key 不会出现在命令历史中。
+macOS 的 `-w` 后不附带值；Windows 使用 `credential_store.py set`，两者都交互读取密钥，
+不会把值写进命令历史。保存后重新运行同一条 `configure.py`
+命令即可继续。安装完成后必须新建 Codex 任务；已经打开的任务不会热加载新 agent
+类型。
 
-然后检查安装：
+其他配置：
 
 ```bash
-python3 scripts/doctor.py
+# Claude primary，Gemini fallback
+python3 scripts/configure.py --profile claude-gemini
+
+# 仅 Gemini
+python3 scripts/configure.py --profile gemini-anthropic
+
+# 第一版 DeepSeek 固定配置，继续兼容
+python3 scripts/configure.py --profile legacy-deepseek
+
+# 安装用户自己生成的 manifest
+python3 scripts/configure.py \
+  --manifest config/my-team.local.json \
+  --name my-team
 ```
 
-`doctor.py` 检查安装文件、Keychain 条目和 Codex 严格配置加载。它不会向 DeepSeek 发送请求，也不会验证余额、网络连通性或实际模型调用。
+完整步骤、升级和卸载规则见 [安装文档](docs/INSTALLATION.md)。
 
-安装后新建一个 Codex 任务。若新任务仍未发现 `deepseek-delegation` 或继续使用旧 agent 指令，再重启 Codex Desktop。是否需要重启取决于当前 Desktop 进程是否已经缓存这些文件。
+## 让 Codex 帮你安装和配置
 
-## 让 Codex 帮你安装
-
-把下面整段 Prompt 发送给 Codex。不要把 DeepSeek API Key 粘贴进对话；Codex 应在需要写入 Keychain 时停下来，让你在本机终端输入。
+把下面整段 Prompt 发送给 Codex。不要在 Prompt 中补充 API Key；配置脚本发现凭证
+缺失后，Codex 必须停下来让你在本机终端交互输入。
 
 ```text
-请安装并验证 Codex DeepSeek Subagents，仓库地址：
-https://github.com/wongchisum/codex-ds-sub-agents
+请为我安装并配置 Codex Custom Subagents：
+https://github.com/wongchisum/codex-custom-subagents
 
-要求：
-1. 先检查当前系统是否为 macOS，并运行 codex --version 与 python3 --version；记录真实输出，不猜测兼容性。
-2. 如果本地没有仓库，克隆到我有写权限的开发目录；如果已经存在，先检查工作区状态，不覆盖未提交修改。
-3. 阅读 README.md、scripts/install.py、config/deepseek-provider.toml、agents/deepseek-worker.toml.template 和 models/deepseek-v4-flash.json，确认安装目标和将要修改的 ~/.codex 文件。
-4. 运行 python3 scripts/install.py。不要把 API Key 写入命令、文件、日志或对话。
-5. 安装脚本完成后，停下来提示我在本机终端运行：
-   /usr/bin/security add-generic-password -U -a codex -s deepseek-api-key -w
-6. 我确认 Key 已保存后，再运行 python3 scripts/doctor.py。
-7. 报告实际修改的文件、备份文件、doctor 结果和未验证事项。doctor 不会调用真实 API，所以不要把 doctor PASS 描述为端到端成功。
-8. 不要提交、推送或修改仓库远端。不要读取或打印 Keychain 中的 Key。
+执行要求：
+1. 检查操作系统、python3 --version、codex --version 和目标目录的 Git 状态。
+   如果仓库不存在，克隆到有写权限的开发目录；如果已经存在，保留所有未提交修改，
+   不执行 reset、checkout 或清理命令。
+2. 阅读 README.md、docs/INSTALLATION.md、scripts/configure.py 和
+   config/model-providers.example.json。先向我确认 primary、fallback 顺序和配置来源。
+3. 如果我选择内置配置，只能使用下列命令之一：
+   python3 scripts/configure.py --profile deepseek-anthropic
+   python3 scripts/configure.py --profile gemini-anthropic
+   python3 scripts/configure.py --profile claude-gemini
+   python3 scripts/configure.py --profile legacy-deepseek
+4. 如果我选择自定义模型，先按 Provider 收集：base_url、upstream_protocol
+   （只能是 openai_responses 或 anthropic_messages）和凭证引用；再收集每个模型的：remote_model、
+   Keychain service 名、上下文声明、输出上限，以及 primary/fallback 顺序。
+   不要索取 API Key。基于示例生成 config/codex-user.local.json，文件中只能保存
+   凭证引用，不能保存 key、token 或 secret，然后运行：
+   python3 scripts/configure.py --manifest config/codex-user.local.json --name codex-user
+5. 如果 configure.py 以 exit 3 停止，原样展示它输出的交互式凭证命令并暂停。
+   让我在本机终端输入凭证；不要代替我读取、打印或转存 Keychain 内容。
+6. 我确认凭证已保存后，重新运行完全相同的 configure.py 命令。不要单独手工修改
+   ~/.codex/config.toml、agent TOML、model catalog 或 LaunchAgent。
+7. 只有 doctor 全部 PASS 后才报告本地安装完成，同时明确 doctor 没有调用真实模型。
+   提示我新建 Codex 任务，再提供一个使用 $deepseek-delegation 的最小测试 Prompt。
+8. 不提交、不推送、不修改 Git remote，也不把 API Key 写入命令参数、文件、日志或对话。
 ```
 
-如果 Codex 无法写入 `~/.codex`，它应请求一次范围明确的文件写入授权，而不是改用其他目录并声称安装成功。
+如果用户已经给出 primary、fallback、URL 和模型名，Codex 可以直接生成自定义 manifest；
+仍然不能代替用户输入凭证。
 
 ## 使用
 
-先在目标项目的 `.gitignore` 中加入：
+目标项目的 `.gitignore` 应包含：
 
 ```gitignore
 /.deepseek-delegations/
 ```
 
-然后在 Codex 中使用：
+示例 Prompt：
 
 ```text
-使用 $deepseek-delegation，把以下两个独立任务放入同一个任务池，并同时创建两个 deepseek_worker，全部使用 fork_turns: "none"。主智能体只负责拆分、等待和最终验收。
-
-任务一，ID 为 analyze_auth：
-分析 src/auth 的调用关系和错误边界，不修改代码，报告文件与行号证据。
-
-任务二，ID 为 test_users：
-运行用户模块测试，定位失败根因；只允许修改 tests/users，完成后重新运行相关测试。
-
-验收要求：
-1. 每个 worker 返回不同的 task_id、claim_id、claimed path 和 receipt。
-2. 每个 worker 只执行自己领取的任务。
-3. 主智能体检查真实文件与测试输出，并报告 worker 和任务的对应关系。
+使用 $deepseek-delegation，把代码审查和测试分析拆成两个独立任务。
+读取当前 subagent-selection.json，整批使用其中 active.agent，
+以 fork_turns: "none" 同时创建 worker。主智能体负责验收结果；
+不要在同一批次混用 primary 与 fallback。
 ```
 
-任务正文应写明目标、文件范围、是否允许修改、输出格式和验证命令。不要并行执行依赖同一批未提交修改的任务。并发数量受当前 Codex agent slots 限制，任务较多时会分批执行。
+`deepseek-delegation` 是为旧版兼容保留的 skill ID，不代表只能调用 DeepSeek。manifest 选中的 agent 可以绑定 Claude、Gemini、DeepSeek 或其他受支持模型。
 
-更多示例见 [examples/parallel-prompt.md](examples/parallel-prompt.md)。
+## 文档
 
-## 本地测试目录
+- [安装、升级与卸载](docs/INSTALLATION.md)
+- [系统架构](docs/ARCHITECTURE.md)
+- [模型、Provider 与协议适配](docs/MODEL_ADAPTERS.md)
+- [任务信箱、fallback 与安全实现](docs/IMPLEMENTATION.md)
+- [从旧版名称与固定 DeepSeek 配置迁移](docs/MIGRATION.md)
+- [测试范围与命令](docs/TESTING.md)
+- [Windows 真机兼容测试与日志采集](docs/WINDOWS_TESTING.md)
+- [当前实测报告](TEST_REPORT.md)
 
-仓库的 `worktree/` 用于隔离子智能体测试，每个任务一个目录：
+## 已验证边界
 
-```text
-worktree/
-  task-001/
-  task-002/
-```
+- Codex 最低客户端声明为 `0.146.0`；当前完整测试快照使用 `0.146.0-alpha.9.2`。
+- 真实调用已覆盖 DeepSeek V4 Flash、Claude Code 兼容端点和 Gemini Anthropic 兼容端点；详见测试报告。
+- catalog 可声明 1M 上下文，但一次原生 Desktop sub-agent 实测的 `model_context_window` 为 `258400`。声明值不等于运行时实际值。
+- `doctor.py` 只检查安装、凭证条目和 adapter 健康；它不会发送真实模型请求，也不验证余额。
+- 当前 Codex 运行时 provider 必须使用 `responses`。Anthropic Messages 通过本机 adapter 转换。
+- Windows 目前完成了平台分支和模拟自动化测试；发布前仍需按清单完成 Windows 10/11 真机验证。
 
-`worktree/` 和仓库根目录的 `.deepseek-delegations/` 已被 Git 忽略，不应提交。目标项目也需要单独忽略自己的 `.deepseek-delegations/`。
-
-## 验证
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 scripts/doctor.py
-```
-
-端到端验证必须在 Codex Desktop 中实际创建至少一个 `deepseek_worker`，确认它能领取任务、调用所需工具并回传结果。单独运行 `doctor.py` 不能证明 API 调用成功。
-
-## 卸载
-
-先预览：
-
-```bash
-python3 scripts/uninstall.py --dry-run
-```
-
-确认后卸载：
-
-```bash
-python3 scripts/uninstall.py
-```
-
-卸载器只删除与当前项目安装内容完全一致的 agent、模型和 skill 文件。用户修改过的文件、未知文件和符号链接会保留。只有当 DeepSeek provider 块与项目模板完全一致并位于 `config.toml` 末尾时，卸载器才会移除它；修改配置前会创建备份。
-
-## 限制与安全边界
-
-- 当前只实现 macOS Keychain 认证；Linux 和 Windows 尚未支持。
-- 任务正文保存在工作区明文文件中，不得包含密钥、访问令牌或隐私数据。
-- worker 请求会发送到 DeepSeek API，而不是 OpenAI API。使用前应确认代码和数据允许发送给该服务。
-- 模型目录把输入声明为文本；不要依赖图片输入。
-- DeepSeek Responses API 只兼容部分 OpenAI Responses API 字段和工具。具体支持范围以 [DeepSeek 官方兼容性说明](https://api-docs.deepseek.com/zh-cn/guides/responses_api/) 为准。
-- 自定义 agent、model catalog 和 provider 配置可能随 Codex 版本变化。升级 Codex 后应重新运行测试和真实 worker 验证。
-- worker 异常退出后不会自动重排任务。父智能体确认 worker 已停止后，才能用 `recover` 恢复。
-- 仓库尚未选择开源许可证。在许可证加入前，默认版权规则仍然适用。
-
-协议与恢复流程见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+本项目是第三方集成，不是 OpenAI、Anthropic、Google 或 DeepSeek 的官方产品。

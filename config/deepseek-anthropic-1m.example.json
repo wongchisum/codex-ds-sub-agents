@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "selection": {
+    "primary": "deepseek-v4-flash",
+    "fallbacks": [],
+    "max_switches": 0
+  },
+  "providers": [
+    {
+      "id": "deepseek_anthropic",
+      "name": "DeepSeek Anthropic Messages",
+      "base_url": "https://api.deepseek.com/anthropic",
+      "protocol": "responses",
+      "upstream_protocol": "anthropic_messages",
+      "auth": {
+        "type": "keychain",
+        "service": "deepseek-api-key",
+        "account": "codex"
+      },
+      "request_max_retries": 2,
+      "stream_max_retries": 2,
+      "stream_idle_timeout_ms": 300000
+    }
+  ],
+  "models": [
+    {
+      "id": "deepseek-v4-flash",
+      "provider": "deepseek_anthropic",
+      "remote_model": "deepseek-v4-flash",
+      "agent": "deepseek_anthropic_worker",
+      "reasoning_effort": "high",
+      "display_name": "DeepSeek V4 Flash (Anthropic)",
+      "context_window": 1048576,
+      "max_context_window": 1048576,
+      "effective_context_window_percent": 95,
+      "supports_parallel_tool_calls": true,
+      "supports_search_tool": false
+    }
+  ]
+}

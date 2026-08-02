@@ -30,7 +30,9 @@ def load_model_catalog() -> dict:
 
 def rendered_agent_toml() -> str:
     template = (PROJECT_ROOT / "agents" / "deepseek-worker.toml.template").read_text(encoding="utf-8")
-    return template.replace("__CODEX_HOME__", "/tmp/codex-home")
+    rendered = template.replace("__CODEX_HOME__", "/tmp/codex-home")
+    rendered = rendered.replace("__PYTHON_COMMAND__", '"/usr/bin/python3"')
+    return rendered
 
 
 class ReleaseAssetTests(unittest.TestCase):
@@ -86,6 +88,10 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertTrue(
             (PROJECT_ROOT / "skills" / "deepseek-delegation" / "scripts" / "claim_task.py").is_file()
         )
+        interface = (
+            PROJECT_ROOT / "skills" / "deepseek-delegation" / "agents" / "openai.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn('display_name: "Custom Subagent Delegation"', interface)
 
     def test_minimum_version_is_consistent_across_repo(self) -> None:
         self.assertEqual(MINIMAL_CLIENT_VERSION, load_model_catalog()["models"][0]["minimal_client_version"])
@@ -99,14 +105,26 @@ class ReleaseAssetTests(unittest.TestCase):
     def test_readmes_cross_link_and_reference_existing_screenshot(self) -> None:
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
         readme_en = (PROJECT_ROOT / "README_EN.md").read_text(encoding="utf-8")
-        screenshot = PROJECT_ROOT / "assets" / "codex-deepseek-subagents.png"
+        screenshot = PROJECT_ROOT / "assets" / "codex-custom-subagents.png"
 
         self.assertIn("[English](README_EN.md)", readme)
         self.assertIn("[中文](README.md)", readme_en)
-        self.assertIn("assets/codex-deepseek-subagents.png", readme)
-        self.assertIn("assets/codex-deepseek-subagents.png", readme_en)
+        self.assertIn("assets/codex-custom-subagents.png", readme)
+        self.assertIn("assets/codex-custom-subagents.png", readme_en)
         self.assertTrue(screenshot.is_file())
         self.assertEqual(b"\x89PNG\r\n\x1a\n", screenshot.read_bytes()[:8])
+
+    def test_plugin_manifest_uses_custom_subagents_name(self) -> None:
+        manifest_path = PROJECT_ROOT / ".codex-plugin" / "plugin.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual("codex-custom-subagents", manifest["name"])
+        self.assertEqual("Codex Custom Subagents", manifest["interface"]["displayName"])
+        self.assertEqual("./skills/", manifest["skills"])
+
+        for readme_name in ("README.md", "README_EN.md"):
+            readme = (PROJECT_ROOT / readme_name).read_text(encoding="utf-8")
+            self.assertIn("Codex Custom Subagents", readme)
+            self.assertNotIn("github.com/wongchisum/codex-ds-sub-agents", readme)
 
     def test_worktree_and_delegations_are_ignored_forever(self) -> None:
         gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
@@ -120,6 +138,18 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertIn("--dry-run", source)
         self.assertIn("preserved", source)
         compile(source, str(uninstall), "exec")
+
+    def test_configure_entrypoint_is_documented_and_compilable(self) -> None:
+        configure = PROJECT_ROOT / "scripts" / "configure.py"
+        source = configure.read_text(encoding="utf-8")
+        compile(source, str(configure), "exec")
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("python3 scripts/configure.py --profile", readme)
+        self.assertIn("让 Codex 帮你安装和配置", readme)
+        self.assertIn(
+            "/config/*.local.json",
+            (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8"),
+        )
 
 
 if __name__ == "__main__":

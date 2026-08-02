@@ -1,0 +1,35 @@
+{
+  "name": "codex-custom-subagents",
+  "version": "0.1.0",
+  "description": "Run Codex subagents with configurable external models, protocol adapters, and ordered fallbacks.",
+  "author": {
+    "name": "wongchisum",
+    "url": "https://github.com/wongchisum"
+  },
+  "homepage": "https://github.com/wongchisum/codex-custom-subagents",
+  "repository": "https://github.com/wongchisum/codex-custom-subagents.git",
+  "keywords": [
+    "subagents",
+    "multi-model",
+    "anthropic",
+    "gemini",
+    "deepseek"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Custom Subagents",
+    "shortDescription": "Run subagents through custom model providers.",
+    "longDescription": "Configure one active subagent model, ordered fallbacks, custom endpoints, credential references, and Anthropic Messages adapters.",
+    "developerName": "wongchisum",
+    "category": "Productivity",
+    "capabilities": [
+      "Multi-model subagents",
+      "Protocol adapters",
+      "Fallback routing"
+    ],
+    "websiteURL": "https://github.com/wongchisum/codex-custom-subagents",
+    "defaultPrompt": [
+      "Use $deepseek-delegation to split this task across the configured custom subagent model."
+    ]
+  }
+}

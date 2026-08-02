@@ -1,118 +1,77 @@
-# Codex DeepSeek Subagents
+# Codex Custom Subagents
 
-[中文](README.md) · [Architecture](ARCHITECTURE.md)
+[中文](README.md) · [Installation](docs/INSTALLATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Model adapters](docs/MODEL_ADAPTERS.md)
 
-This project lets Codex Desktop use `deepseek-v4-flash` as a subagent model and dispatch multiple independent work items from one parent task.
+`codex-custom-subagents` lets Codex Desktop create subagents backed by custom providers, model names, URLs, and protocols. A manifest may declare multiple candidates, but one batch uses exactly one model. After an eligible transport failure, the parent can switch the whole batch to the next configured fallback.
 
-> This is a third-party integration. It is not a Codex plugin published by OpenAI or DeepSeek. The repository does not contain a `.codex-plugin/plugin.json`; its installer writes Codex agent, model catalog, model provider, and skill configuration files.
+The repository is a Codex plugin containing the compatibility-named `deepseek-delegation` skill, an installer, model-catalog generation, an Anthropic Messages adapter, and macOS LaunchAgent / Windows Task Scheduler service management.
 
-![DeepSeek subagent tasks in Codex Desktop](assets/codex-deepseek-subagents.png)
+![Custom subagent tasks in Codex Desktop](assets/codex-custom-subagents.png)
 
-The screenshot comes from a local test. The right pane shows several DeepSeek workers running review, implementation, and protocol-check tasks. Names, counts, and UI details depend on the prompt and Codex version.
+The screenshot is from a local DeepSeek worker test. Claude, Gemini, DeepSeek's Anthropic endpoint, and other compatible Anthropic Messages gateways can also be configured.
 
-## How it works
+## Quick start
 
-In the tested environment, native parent-to-child messages for a custom provider may reach DeepSeek without the complete task body or task name. This project passes task bodies through workspace files while keeping Codex Desktop's subagent list, tool execution, and result reporting:
-
-```text
-Parent splits independent tasks
-  → writes .deepseek-delegations/pending/
-  → creates one or more deepseek_worker agents
-  → each worker atomically claims one task into claimed/
-  → worker returns task_id, claim_id, path, and receipt
-  → parent inspects the files and test results
-```
-
-The claim script uses an atomic rename on one filesystem so two workers cannot claim the same task. Receipts make claimed tasks recoverable when a result is not delivered. `recover` does not decide whether a worker is dead; the parent must confirm that before requeueing work.
-
-## Verified scope
-
-- macOS
-- Codex Desktop and Codex CLI `0.146.0-alpha.3.1`
-- Python 3.9 and 3.13; CI uses Python 3.11
-- `deepseek-v4-flash`
-- DeepSeek Responses API base URL `https://api.deepseek.com`
-- A `deepseek-api-key` item in macOS Keychain
-
-`models/deepseek-v4-flash.json` currently declares `minimal_client_version: 0.146.0`. This is the project's client version gate, not evidence that every earlier or later Codex version has been tested.
-
-DeepSeek's current documentation lists `deepseek-v4-flash`, identifies the deployed version as `DeepSeek-V4-Flash-0731`, and documents Responses API support for that model:
-
-- [DeepSeek API quick start](https://api-docs.deepseek.com/)
-- [DeepSeek Responses API compatibility](https://api-docs.deepseek.com/guides/responses_api/)
-
-## Installation
-
-### Requirements
-
-- macOS
-- Codex Desktop installed and signed in
-- `git` and `python3`
-- A valid DeepSeek API key
-
-### Clone and install
+Requirements: macOS, Codex Desktop signed in, Python 3.9+, `git`, and credentials for the selected provider.
 
 ```bash
-git clone https://github.com/wongchisum/codex-ds-sub-agents.git
-cd codex-ds-sub-agents
-python3 scripts/install.py
+git clone https://github.com/wongchisum/codex-custom-subagents.git
+cd codex-custom-subagents
+python3 scripts/configure.py --list-protocols
+python3 scripts/configure.py --profile deepseek-anthropic
 ```
 
-The installer:
-
-- installs `deepseek_worker` under `~/.codex/agents/`
-- installs the model catalog under `~/.codex/models/`
-- installs the `deepseek-delegation` skill under `~/.codex/skills/`
-- appends the DeepSeek provider to `~/.codex/config.toml` when it is absent
-- creates timestamped backups before replacing project-managed files that have changed
-
-It does not modify the repository's `worktree/`. During a skill upgrade, it removes only files recorded in the old install manifest that are absent from the new version and have not been modified by the user.
-
-### Store the API key
-
-Do not put the key in a README, prompt, Git configuration, or task file. Run:
+`configure.py` copies the selected manifest to
+`~/.codex/custom-subagents/manifests/`, checks credential references, and only then
+installs and runs doctor. When a credential is missing it stops before installation
+with status 3 and prints a safe local command such as:
 
 ```bash
 /usr/bin/security add-generic-password -U -a codex -s deepseek-api-key -w
 ```
 
-With `-w` as the final option and no value, macOS `security` reads the password interactively, so it does not appear in shell history.
+With no value after `-w`, macOS reads the secret interactively. Save it locally and
+run the same configure command again. Start a new Codex task after installation
+because open tasks do not hot-load newly installed agent types.
 
-Then check the installation:
+Profiles are compatibility examples. New manifests use `schema_version: 2` and declare each Provider as `openai_responses` or `anthropic_messages`; model names do not select protocols.
+
+Other compatibility profiles:
 
 ```bash
-python3 scripts/doctor.py
+# Claude primary with Gemini fallback
+python3 scripts/configure.py --profile claude-gemini
+
+# Gemini only
+python3 scripts/configure.py --profile gemini-anthropic
+
+# Legacy fixed DeepSeek profile
+python3 scripts/configure.py --profile legacy-deepseek
+
+# Custom manifest generated from your provider details
+python3 scripts/configure.py \
+  --manifest config/my-team.local.json \
+  --name my-team
 ```
 
-`doctor.py` checks installed files, the Keychain item, and Codex strict-config loading. It does not call DeepSeek and does not verify network access, account balance, or a real model request.
+## Ask Codex to install it
 
-Start a new Codex task after installation. If the new task still does not discover `deepseek-delegation` or uses old agent instructions, restart Codex Desktop. Whether a restart is required depends on which files the running Desktop process has already cached.
+Send Codex the installation prompt in the Chinese README's
+“让 Codex 帮你安装和配置” section, or ask it to follow these rules:
 
-## Prompt Codex to install it
-
-Send the complete prompt below to Codex. Do not paste the DeepSeek API key into the conversation. Codex should stop and let you enter it locally when Keychain setup is required.
-
-```text
-Install and verify Codex DeepSeek Subagents from:
-https://github.com/wongchisum/codex-ds-sub-agents
-
-Requirements:
-1. Confirm that the system is macOS. Run codex --version and python3 --version and report their real output; do not infer compatibility.
-2. If the repository is absent, clone it into a writable development directory. If it already exists, inspect the working tree first and preserve uncommitted changes.
-3. Read README_EN.md, scripts/install.py, config/deepseek-provider.toml, agents/deepseek-worker.toml.template, and models/deepseek-v4-flash.json. Report which ~/.codex files the installer will change.
-4. Run python3 scripts/install.py. Never put the API key in a command, file, log, or conversation.
-5. After installation, stop and ask me to run this command in my local terminal:
-   /usr/bin/security add-generic-password -U -a codex -s deepseek-api-key -w
-6. After I confirm that the key is stored, run python3 scripts/doctor.py.
-7. Report modified files, backups, doctor results, and anything not verified. doctor does not make a real API call, so do not describe a PASS as end-to-end success.
-8. Do not commit, push, or modify Git remotes. Do not read or print the Keychain secret.
-```
-
-If Codex cannot write to `~/.codex`, it should request narrowly scoped filesystem approval instead of installing somewhere else and reporting success.
+1. Inspect the repository and read `scripts/configure.py` before changing anything.
+2. Confirm the primary model, ordered fallbacks, URLs, remote model names, protocol,
+   Keychain service names, context declarations, and output limits.
+3. Never request or store API-key values. Custom manifests contain references only.
+4. Run one explicit `configure.py --profile ...` command, or generate an ignored
+   `config/*.local.json` file and run `configure.py --manifest ... --name ...`.
+5. On exit 3, show the printed Keychain command and stop for local user input.
+6. Re-run the same configure command after confirmation. Report completion only
+   when doctor passes, then ask the user to start a new Codex task.
 
 ## Usage
 
-Add this to the target project's `.gitignore`:
+Ignore the durable mailbox in the target repository:
 
 ```gitignore
 /.deepseek-delegations/
@@ -121,70 +80,30 @@ Add this to the target project's `.gitignore`:
 Then prompt Codex:
 
 ```text
-Use $deepseek-delegation. Put the following two independent tasks into one task pool and create two deepseek_worker agents at the same time, both with fork_turns: "none". The parent agent should only split the work, wait, and perform final verification.
-
-Task one, ID analyze_auth:
-Analyze call relationships and error boundaries in src/auth. Do not edit files. Report file and line evidence.
-
-Task two, ID test_users:
-Run the user-module tests and find the root cause. Only tests/users may be changed. Rerun the relevant tests after the change.
-
-Acceptance:
-1. Each worker returns a distinct task_id, claim_id, claimed path, and receipt.
-2. Each worker performs only the task it claimed.
-3. The parent checks the real files and test output and reports the worker-to-task mapping.
+Use $deepseek-delegation. Split review and test analysis into two independent
+tasks. Resolve the active agent from subagent-selection.json and create both
+workers with fork_turns: "none". Do not mix primary and fallback models in one batch.
 ```
 
-Each task should define its objective, allowed files, edit permissions, expected output, and verification command. Do not parallelize tasks that depend on the same uncommitted changes. Concurrency is limited by the available Codex agent slots; larger batches run in waves.
+`deepseek-delegation` remains the skill ID for backward compatibility; the selected manifest agent may use Claude, Gemini, DeepSeek, or another supported model.
 
-See [examples/parallel-prompt.md](examples/parallel-prompt.md) for another copyable example.
+## Documentation
 
-## Local test directory
+- [Installation, upgrade, and uninstall](docs/INSTALLATION.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Providers and protocol adapters](docs/MODEL_ADAPTERS.md)
+- [Windows real-machine testing and diagnostics](docs/WINDOWS_TESTING.md)
+- [Implementation details](docs/IMPLEMENTATION.md)
+- [Migration and compatibility](docs/MIGRATION.md)
+- [Testing](docs/TESTING.md)
+- [Current test report](TEST_REPORT.md)
 
-The repository's `worktree/` directory is reserved for isolated subagent tests:
+## Verified boundaries
 
-```text
-worktree/
-  task-001/
-  task-002/
-```
+- The catalog minimum is `0.146.0`; the current complete test snapshot used `0.146.0-alpha.9.2`.
+- A catalog can declare a 1M context window, while one native Desktop run reported an actual `model_context_window` of `258400`.
+- `doctor.py` validates installation state, credential references, and adapter health. It does not make a real model request or validate billing.
+- The tested Codex runtime accepts `responses` providers. Anthropic Messages is supported through the local adapter.
+- Windows platform branches have automated simulated coverage but still require the documented Windows 10/11 real-machine acceptance run.
 
-Both `worktree/` and the repository root's `.deepseek-delegations/` are ignored by Git and must not be committed. Target projects must ignore their own `.deepseek-delegations/` directory separately.
-
-## Verification
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 scripts/doctor.py
-```
-
-End-to-end verification requires creating at least one real `deepseek_worker` in Codex Desktop and confirming that it can claim a task, use the required tools, and return a result. A passing `doctor.py` check alone is not end-to-end proof.
-
-## Uninstall
-
-Preview first:
-
-```bash
-python3 scripts/uninstall.py --dry-run
-```
-
-Then uninstall:
-
-```bash
-python3 scripts/uninstall.py
-```
-
-The uninstaller removes only agent, model, and skill files that exactly match the current project content. Modified files, unknown files, and symlinks are preserved. It removes the provider block only when that block exactly matches the project template and is at the end of `config.toml`; it creates a backup before changing the config.
-
-## Limitations and security boundaries
-
-- Authentication currently depends on macOS Keychain. Linux and Windows are not supported.
-- Task bodies are plaintext workspace files. Never put secrets, access tokens, or private user data in them.
-- Worker requests are sent to the DeepSeek API, not the OpenAI API. Confirm that the code and data may be shared with that service.
-- The model catalog declares text input only. Do not rely on image input.
-- DeepSeek implements only part of the OpenAI Responses API surface. Refer to [DeepSeek's compatibility table](https://api-docs.deepseek.com/guides/responses_api/) for supported fields and tools.
-- Custom agent, model catalog, and provider configuration may change between Codex releases. Rerun the tests and a real-worker check after upgrading Codex.
-- A crashed worker is not requeued automatically. The parent must confirm that it has stopped before using `recover`.
-- The repository does not yet include an open-source license. Default copyright restrictions apply until one is added.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the mailbox protocol and recovery flow.
+This is a third-party integration, not an official OpenAI, Anthropic, Google, or DeepSeek product.
