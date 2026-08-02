@@ -32,9 +32,12 @@ from platform_runtime import python_command, python_command_toml, toml_path_esca
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROVIDER_HEADER = "[model_providers.deepseek]"
 LEGACY_WORKER_AGENT = "deepseek_worker"
-SKILL_NAME = "codex-custom-agents"
-LEGACY_SKILL_NAME = "deepseek-delegation"
+SKILL_NAME = "codex-custom-subagents"
+LEGACY_SKILL_NAMES = ("deepseek-delegation", "codex-custom-agents")
 SKILL_MANIFEST = ".codex-deepseek-manifest.json"
+SKILL_IGNORED_DIRECTORIES = frozenset({"__pycache__"})
+SKILL_IGNORED_FILES = frozenset({".DS_Store"})
+SKILL_IGNORED_SUFFIXES = frozenset({".pyc", ".pyo"})
 INSTALL_REGISTRY = ".codex-subagent-installations.json"
 INSTALL_REGISTRY_VERSION = 1
 
@@ -137,10 +140,13 @@ def install_file(
     destination: Path,
     replacements: dict[str, str] | None = None,
 ) -> None:
-    text = source.read_text(encoding="utf-8")
-    for old, new in (replacements or {}).items():
-        text = text.replace(old, new)
-    content = text.encode("utf-8")
+    if replacements is None:
+        content = source.read_bytes()
+    else:
+        text = source.read_text(encoding="utf-8")
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+        content = text.encode("utf-8")
     atomic_write(destination, content, stat.S_IMODE(source.stat().st_mode))
     print(f"installed: {destination}")
 
@@ -444,11 +450,25 @@ def rollback_selection(
     path.unlink()
 
 
+def skill_source_files(source: Path) -> tuple[Path, ...]:
+    """Return distributable Skill files without interpreter or OS caches."""
+    files = []
+    for path in sorted(source.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(source)
+        if any(part in SKILL_IGNORED_DIRECTORIES for part in relative.parts[:-1]):
+            continue
+        if path.name in SKILL_IGNORED_FILES or path.suffix in SKILL_IGNORED_SUFFIXES:
+            continue
+        files.append(path)
+    return tuple(files)
+
+
 def skill_manifest(source: Path) -> dict[str, object]:
     files = {
         path.relative_to(source).as_posix(): file_digest(path)
-        for path in sorted(source.rglob("*"))
-        if path.is_file() and not path.is_symlink()
+        for path in skill_source_files(source)
     }
     return {"version": 1, "files": files}
 
@@ -522,8 +542,12 @@ def prune_empty_directories(destination: Path, dry_run: bool = False) -> None:
                 pass
 
 
-def remove_managed_legacy_skill(codex_home: Path, dry_run: bool = False) -> str | None:
-    """Remove an owned managed `deepseek-delegation` skill install.
+def remove_managed_legacy_skill(
+    codex_home: Path,
+    skill_name: str,
+    dry_run: bool = False,
+) -> str | None:
+    """Remove one owned managed legacy skill install.
 
     Only files recorded in the legacy install's own
     ``.codex-deepseek-manifest.json`` and unchanged since install are removed.
@@ -531,7 +555,9 @@ def remove_managed_legacy_skill(codex_home: Path, dry_run: bool = False) -> str 
     destination when it exists (it may remain with preserved user files) or
     None when nothing legacy is installed.
     """
-    destination = codex_home / "skills" / LEGACY_SKILL_NAME
+    if skill_name not in LEGACY_SKILL_NAMES:
+        raise InstallError(f"refusing to remove unknown legacy skill name: {skill_name}")
+    destination = codex_home / "skills" / skill_name
     if not destination.exists():
         return None
     if destination.is_symlink():
@@ -550,27 +576,41 @@ def remove_managed_legacy_skill(codex_home: Path, dry_run: bool = False) -> str 
         manifest_path.unlink()
         print(f"removed: {manifest_path}")
     prune_empty_directories(destination, dry_run)
-    print(f"legacy skill: removed {len(removed)} owned file(s), preserved {len(preserved)}")
+    print(
+        f"legacy skill {skill_name}: removed {len(removed)} owned file(s), "
+        f"preserved {len(preserved)}"
+    )
     return str(destination)
 
 
+def remove_managed_legacy_skills(
+    codex_home: Path,
+    dry_run: bool = False,
+) -> tuple[str, ...]:
+    """Remove every recognized managed predecessor of the current skill."""
+    removed = []
+    for skill_name in LEGACY_SKILL_NAMES:
+        destination = remove_managed_legacy_skill(codex_home, skill_name, dry_run)
+        if destination is not None:
+            removed.append(destination)
+    return tuple(removed)
+
+
 def install_skill(codex_home: Path) -> None:
-    remove_managed_legacy_skill(codex_home)
+    remove_managed_legacy_skills(codex_home)
     source = PROJECT_ROOT / "skills" / SKILL_NAME
     destination = codex_home / "skills" / SKILL_NAME
     ensure_not_symlink(destination)
     manifest_path = destination / SKILL_MANIFEST
     previous_files = read_skill_manifest(manifest_path)
-    if destination.exists():
-        if not destination.is_dir():
-            raise InstallError(f"refusing to install into non-directory {destination}")
-        for path in source.rglob("*"):
-            if path.is_file() and not path.is_symlink():
-                relative = path.relative_to(source)
-                install_file(path, destination / relative)
-    else:
-        shutil.copytree(source, destination)
+    if destination.exists() and not destination.is_dir():
+        raise InstallError(f"refusing to install into non-directory {destination}")
+    if not destination.exists():
+        destination.mkdir(parents=True)
         print(f"installed: {destination}")
+    for path in skill_source_files(source):
+        relative = path.relative_to(source)
+        install_file(path, destination / relative)
 
     current_files = skill_manifest(source)["files"]
     assert isinstance(current_files, dict)

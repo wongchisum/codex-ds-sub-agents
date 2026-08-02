@@ -172,13 +172,28 @@ class ConfigureTests(unittest.TestCase):
         output = StringIO()
         with patch.object(
             configure.platform, "system", return_value="Windows"
+        ), patch.object(
+            configure,
+            "python_command",
+            return_value=r"C:\Program Files\Python314\python.exe",
         ), redirect_stdout(output):
             configure.print_credential_instructions(
-                (configure.MissingCredential("keychain", "provider-key", "codex"),)
+                (
+                    configure.MissingCredential(
+                        "keychain",
+                        "provider key",
+                        "team account",
+                    ),
+                )
             )
         rendered = output.getvalue()
         self.assertIn("credential_store.py", rendered)
         self.assertIn(" set ", rendered)
+        self.assertIn(r'"C:\Program Files\Python314\python.exe"', rendered)
+        self.assertIn('--account "team account"', rendered)
+        self.assertIn('--service "provider key"', rendered)
+        self.assertNotIn("'team account'", rendered)
+        self.assertNotIn("\npython ", rendered)
         self.assertNotIn("-w ", rendered)
 
     def test_install_and_doctor_commands_share_managed_manifest(self) -> None:
@@ -251,6 +266,7 @@ class ConfigureTests(unittest.TestCase):
     def test_main_runs_doctor_after_successful_install(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             calls: list[list[str]] = []
+            output = StringIO()
 
             def fake_run(command: list[str], **_kwargs: object) -> int:
                 calls.append(command)
@@ -258,7 +274,7 @@ class ConfigureTests(unittest.TestCase):
 
             with patch.object(configure, "run_command", side_effect=fake_run), patch.object(
                 configure, "missing_credentials", return_value=()
-            ):
+            ), redirect_stdout(output):
                 result = configure.main(
                     [
                         "--profile",
@@ -272,6 +288,31 @@ class ConfigureTests(unittest.TestCase):
             self.assertEqual(2, len(calls))
             self.assertIn("install.py", calls[0][1])
             self.assertIn("doctor.py", calls[1][1])
+            self.assertIn("start a NEW Codex task", output.getvalue())
+            self.assertIn("unknown agent_type", output.getvalue())
+            self.assertIn("$codex-custom-subagents", output.getvalue())
+
+    def test_skip_doctor_still_requires_a_new_task(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = StringIO()
+            with patch.object(configure, "run_command", return_value=0) as run, patch.object(
+                configure, "missing_credentials", return_value=()
+            ), redirect_stdout(output):
+                result = configure.main(
+                    [
+                        "--profile",
+                        "gemini-anthropic",
+                        "--codex-home",
+                        str(Path(directory) / "codex-home"),
+                        "--skip-doctor",
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            run.assert_called_once()
+            self.assertIn("doctor was skipped", output.getvalue())
+            self.assertIn("start a NEW Codex task", output.getvalue())
+            self.assertIn("unknown agent_type", output.getvalue())
 
     def test_install_failure_is_returned_without_running_doctor(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

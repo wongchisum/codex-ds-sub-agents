@@ -1,31 +1,46 @@
-# 文档索引
+# Documentation
 
-`codex-custom-subagents` 的 README 只保留项目简介和最短安装路径。配置、迁移、排错和测试细节按下面的入口查找。
+English · [简体中文](zh-CN/README.md)
 
-## 安装与配置
+`codex-custom-subagents` helps Codex Desktop use custom model providers as subagents to complete tasks on macOS and Windows.
 
-- [安装、升级与卸载](INSTALLATION.md)：macOS / Windows 安装结果、凭证、doctor 和卸载。
-- [模型与 fallback 配置](CONFIGURATION.md)：模型-协议选择、独立 fallback、manifest 和非交互命令。
-- [模型、Provider 与协议适配](MODEL_ADAPTERS.md)：schema、Responses / Anthropic Messages 适配边界。
-- [让 Codex 帮你安装](PROMPT_INSTALLATION.md)：可以直接发送给 Codex 的安全安装 Prompt。
+## Start with Codex
 
-## 架构与维护
+1. Copy the [installation prompt](PROMPT_INSTALLATION.md) into Codex Desktop.
+2. Let Codex inspect the platform, collect non-secret provider settings, run the installer, and verify the result.
+3. Start a new Codex task after installation.
+4. Use `$codex-custom-subagents` to delegate work.
 
-- [系统架构](ARCHITECTURE.md)：模块职责、请求路径、单模型批次和任务信箱。
-- [实现原理](IMPLEMENTATION.md)：安装事务、回执、fallback 状态和安全边界。
-- [Skill 迁移](MIGRATION.md)：从旧 `$deepseek-delegation` 安装迁移到 `$codex-custom-agents`。
-- [故障排查](TROUBLESHOOTING.md)：安装失败、agent 缓存、凭证和 adapter 日志。
+Example usage:
 
-## 测试
+```text
+Use $codex-custom-subagents to delegate this task to the configured custom
+subagent. Read subagent-selection.json, use its active.agent, and verify the
+worker's artifacts and tests before accepting the result.
+```
 
-- [自动化与 Desktop 验收](TESTING.md)：单元测试、真实 worker 和 fallback 验收。
-- [Windows 真机测试](WINDOWS_TESTING.md)：Task Scheduler、Credential Manager、重启和诊断包。
-- [当前测试报告](../TEST_REPORT.md)：已经获得的证据和仍未验证的边界。
+## Install and configure
 
-## 阅读顺序
+- [Installation, upgrade, and uninstall](INSTALLATION.md)
+- [Model and fallback configuration](CONFIGURATION.md)
+- [Providers and protocol adapters](MODEL_ADAPTERS.md)
+- [Prompt: ask Codex to install it](PROMPT_INSTALLATION.md)
 
-普通安装：`INSTALLATION` → `CONFIGURATION` → `TESTING`。
+## Architecture and maintenance
 
-旧版升级：`MIGRATION` → `INSTALLATION` → `TROUBLESHOOTING`。
+- [Architecture](ARCHITECTURE.md)
+- [Implementation](IMPLEMENTATION.md)
+- [Skill migration](MIGRATION.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
 
-新增协议：`ARCHITECTURE` → `MODEL_ADAPTERS` → `IMPLEMENTATION`。
+## Test and release
+
+- [Automated and Desktop testing](TESTING.md)
+- [Windows real-machine checklist](WINDOWS_TESTING.md)
+- [Current test report](../TEST_REPORT.md)
+
+Suggested reading paths:
+
+- First install: `PROMPT_INSTALLATION` → `INSTALLATION` → `CONFIGURATION`
+- Upgrade: `MIGRATION` → `INSTALLATION` → `TROUBLESHOOTING`
+- New protocol: `ARCHITECTURE` → `MODEL_ADAPTERS` → `IMPLEMENTATION`

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Custom Subagent Delegation"
-  short_description: "Atomic task pool for configured model workers"
-  default_prompt: "Split bounded work into a task pool and delegate it to the configured custom subagent model."

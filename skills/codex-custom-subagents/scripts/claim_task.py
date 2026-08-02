@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomic claim and recovery for a DeepSeek delegation task pool.
+"""Atomic claim and recovery for a Codex Custom Subagents task pool.
 
 The pool lives at the calling thread's REAL cwd (``.deepseek-delegations``):
 relative ``--workspace`` values are resolved against the process cwd and all

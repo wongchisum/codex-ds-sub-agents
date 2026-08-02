@@ -26,7 +26,7 @@ from install import (
     atomic_write,
     manifest_installation_id,
     read_install_registry,
-    remove_managed_legacy_skill,
+    remove_managed_legacy_skills,
     resolve_codex_home,
     skill_manifest_bytes,
     write_install_registry,
@@ -132,9 +132,9 @@ def uninstall_skill(codex_home: Path, dry_run: bool) -> None:
 
 
 def uninstall_skills(codex_home: Path, dry_run: bool) -> None:
-    """Remove the current skill and any owned managed legacy skill install."""
+    """Remove the current skill and all owned managed legacy skill installs."""
     uninstall_skill(codex_home, dry_run)
-    remove_managed_legacy_skill(codex_home, dry_run)
+    remove_managed_legacy_skills(codex_home, dry_run)
 
 
 def custom_agent_paths(codex_home: Path) -> set[Path]:

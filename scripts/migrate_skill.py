@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate a managed legacy `deepseek-delegation` skill install to `codex-custom-agents`.
+"""Migrate managed predecessor skills to `codex-custom-subagents`.
 
 Detects an old managed install (recognized by its own
 `.codex-deepseek-manifest.json` ownership record), removes only files whose
@@ -15,13 +15,14 @@ import sys
 from pathlib import Path
 
 from install import (
+    LEGACY_SKILL_NAMES,
     InstallError,
     atomic_write,
     file_digest,
     install_legacy_profile,
     install_skill,
     read_install_registry,
-    remove_managed_legacy_skill,
+    remove_managed_legacy_skills,
     resolve_codex_home,
     write_install_registry,
 )
@@ -32,8 +33,8 @@ from model_selection import ValidationError
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Migrate a managed legacy deepseek-delegation skill install to "
-            "codex-custom-agents, then install the current plugin resources."
+            "Migrate managed deepseek-delegation or codex-custom-agents skill installs "
+            "to codex-custom-subagents, then install the current plugin resources."
         )
     )
     parser.add_argument("--codex-home", type=Path, default=resolve_codex_home())
@@ -93,9 +94,12 @@ def main() -> int:
                 "cannot re-render installed agents because these manifests are missing: "
                 + ", ".join(str(path) for path in missing)
             )
-        legacy = remove_managed_legacy_skill(codex_home, dry_run=args.dry_run)
-        if legacy is None:
-            print("no managed legacy deepseek-delegation install found")
+        legacy = remove_managed_legacy_skills(codex_home, dry_run=args.dry_run)
+        if not legacy:
+            print(
+                "no managed legacy skill install found: "
+                + ", ".join(LEGACY_SKILL_NAMES)
+            )
         if args.dry_run:
             if manifest_paths:
                 print(f"would re-render {len(manifest_paths)} registered manifest installation(s)")

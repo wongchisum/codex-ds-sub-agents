@@ -1,4 +1,4 @@
-"""Migration tests for the `deepseek-delegation` → `codex-custom-agents` skill rename."""
+"""Migration tests for predecessor skill names → `codex-custom-subagents`."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ UNINSTALL_SCRIPT = PROJECT_ROOT / "scripts" / "uninstall.py"
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import install  # noqa: E402
 
-LEGACY_SKILL = install.LEGACY_SKILL_NAME
+LEGACY_SKILLS = install.LEGACY_SKILL_NAMES
+ORIGINAL_LEGACY_SKILL = LEGACY_SKILLS[0]
+INTERMEDIATE_LEGACY_SKILL = LEGACY_SKILLS[1]
 NEW_SKILL = install.SKILL_NAME
 
 
@@ -37,11 +39,14 @@ def run_uninstall(codex_home: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def make_legacy_install(codex_home: Path) -> Path:
+def make_legacy_install(
+    codex_home: Path,
+    skill_name: str = ORIGINAL_LEGACY_SKILL,
+) -> Path:
     """Create a legacy managed skill dir whose manifest records exact digests."""
-    legacy = codex_home / "skills" / LEGACY_SKILL
+    legacy = codex_home / "skills" / skill_name
     files = {
-        "SKILL.md": "---\nname: deepseek-delegation\n---\nlegacy body\n",
+        "SKILL.md": f"---\nname: {skill_name}\n---\nlegacy body\n",
         "scripts/claim_task.py": "# legacy claim script\n",
         "agents/openai.yaml": "interface:\n  display_name: Legacy\n",
     }
@@ -68,27 +73,30 @@ class MigrateSkillTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertIn("no managed legacy", result.stdout)
             self.assertTrue((codex_home / "skills" / NEW_SKILL / "SKILL.md").is_file())
-            self.assertFalse((codex_home / "skills" / LEGACY_SKILL).exists())
             agent = (codex_home / "agents" / "deepseek-worker.toml").read_text(encoding="utf-8")
             self.assertIn(f"{codex_home}/skills/{NEW_SKILL}/scripts/claim_task.py", agent)
-            self.assertNotIn(f"skills/{LEGACY_SKILL}/scripts/claim_task.py", agent)
+            for legacy_skill in LEGACY_SKILLS:
+                self.assertFalse((codex_home / "skills" / legacy_skill).exists())
+                self.assertNotIn(f"skills/{legacy_skill}/scripts/claim_task.py", agent)
 
-    def test_migrates_managed_legacy_install(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            codex_home = Path(directory) / "codex-home"
-            legacy = make_legacy_install(codex_home)
-            self.assertTrue((legacy / "SKILL.md").is_file())
+    def test_migrates_each_managed_legacy_install(self) -> None:
+        for legacy_skill in LEGACY_SKILLS:
+            with self.subTest(legacy_skill=legacy_skill), tempfile.TemporaryDirectory() as directory:
+                codex_home = Path(directory) / "codex-home"
+                legacy = make_legacy_install(codex_home, legacy_skill)
+                self.assertTrue((legacy / "SKILL.md").is_file())
 
-            result = run_migrate(codex_home)
+                result = run_migrate(codex_home)
 
-            self.assertEqual(0, result.returncode, result.stderr)
-            self.assertIn("removed", result.stdout)
-            self.assertFalse(legacy.exists())
-            self.assertTrue((codex_home / "skills" / NEW_SKILL / "SKILL.md").is_file())
-            skill_text = (codex_home / "skills" / NEW_SKILL / "SKILL.md").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn("name: codex-custom-agents", skill_text)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("removed", result.stdout)
+                self.assertFalse(legacy.exists())
+                current_skill = codex_home / "skills" / NEW_SKILL / "SKILL.md"
+                self.assertTrue(current_skill.is_file())
+                self.assertIn(
+                    "name: codex-custom-subagents",
+                    current_skill.read_text(encoding="utf-8"),
+                )
 
     def test_preserves_modified_legacy_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -131,7 +139,8 @@ class MigrateSkillTests(unittest.TestCase):
             self.assertEqual(0, second.returncode, second.stderr)
             self.assertIn("no managed legacy", second.stdout)
             self.assertTrue((codex_home / "skills" / NEW_SKILL / "SKILL.md").is_file())
-            self.assertFalse((codex_home / "skills" / LEGACY_SKILL).exists())
+            for legacy_skill in LEGACY_SKILLS:
+                self.assertFalse((codex_home / "skills" / legacy_skill).exists())
 
     def test_registered_custom_agents_are_rerendered_to_new_skill_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -143,24 +152,27 @@ class MigrateSkillTests(unittest.TestCase):
             agent.write_text(
                 current.replace(
                     f"skills/{NEW_SKILL}/scripts/claim_task.py",
-                    f"skills/{LEGACY_SKILL}/scripts/claim_task.py",
+                    f"skills/{INTERMEDIATE_LEGACY_SKILL}/scripts/claim_task.py",
                 ),
                 encoding="utf-8",
             )
-            make_legacy_install(codex_home)
+            make_legacy_install(codex_home, INTERMEDIATE_LEGACY_SKILL)
 
             result = run_migrate(codex_home)
 
             self.assertEqual(0, result.returncode, result.stderr)
             rendered = agent.read_text(encoding="utf-8")
             self.assertIn(f"skills/{NEW_SKILL}/scripts/claim_task.py", rendered)
-            self.assertNotIn(f"skills/{LEGACY_SKILL}/scripts/claim_task.py", rendered)
+            self.assertNotIn(
+                f"skills/{INTERMEDIATE_LEGACY_SKILL}/scripts/claim_task.py",
+                rendered,
+            )
             self.assertIn("1 registered manifest installation(s) re-rendered", result.stdout)
 
     def test_preserves_unmanaged_legacy_directory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             codex_home = Path(directory) / "codex-home"
-            legacy = codex_home / "skills" / LEGACY_SKILL
+            legacy = codex_home / "skills" / ORIGINAL_LEGACY_SKILL
             (legacy / "scripts").mkdir(parents=True)
             (legacy / "SKILL.md").write_text("manual copy\n", encoding="utf-8")
 
@@ -176,7 +188,7 @@ class MigrateSkillTests(unittest.TestCase):
             codex_home = Path(directory) / "codex-home"
             migrated = run_migrate(codex_home)
             self.assertEqual(0, migrated.returncode, migrated.stderr)
-            legacy = make_legacy_install(codex_home)
+            legacy = make_legacy_install(codex_home, INTERMEDIATE_LEGACY_SKILL)
             user_file = legacy / "user-notes.md"
             user_file.write_text("keep\n", encoding="utf-8")
 

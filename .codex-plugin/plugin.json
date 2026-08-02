@@ -1,7 +1,7 @@
 {
   "name": "codex-custom-subagents",
   "version": "0.1.0",
-  "description": "Run Codex subagents with configurable external models, protocol adapters, and ordered fallbacks.",
+  "description": "Use custom model providers as Codex Desktop subagents on macOS and Windows.",
   "author": {
     "name": "wongchisum",
     "url": "https://github.com/wongchisum"
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex Custom Subagents",
-    "shortDescription": "Run subagents through custom model providers.",
-    "longDescription": "Configure one active subagent model, ordered fallbacks, custom endpoints, credential references, and Anthropic Messages adapters.",
+    "shortDescription": "Run Codex tasks with custom subagents.",
+    "longDescription": "Configure custom providers and let Codex Desktop delegate tasks to their subagents across macOS and Windows.",
     "developerName": "wongchisum",
     "category": "Productivity",
     "capabilities": [
@@ -29,7 +29,8 @@
     ],
     "websiteURL": "https://github.com/wongchisum/codex-custom-subagents",
     "defaultPrompt": [
-      "Use $codex-custom-agents to split this task across the configured custom subagent model."
+      "Use $codex-custom-subagents to delegate this task to the configured custom subagent.",
+      "Use $codex-custom-subagents to split this work into parallel subagent tasks."
     ]
   }
 }

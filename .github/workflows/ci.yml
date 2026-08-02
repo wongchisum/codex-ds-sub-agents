@@ -15,6 +15,6 @@ jobs:
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
       - name: Compile Python sources
-        run: python3 -m py_compile scripts/*.py skills/codex-custom-agents/scripts/*.py
+        run: python3 -m py_compile scripts/*.py skills/codex-custom-subagents/scripts/*.py
       - name: Validate release assets (model JSON, provider TOML, rendered agent TOML, skill format)
         run: python3 tests/test_release_assets.py

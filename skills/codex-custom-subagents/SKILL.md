@@ -1,14 +1,14 @@
 ---
-name: codex-custom-agents
+name: codex-custom-subagents
 description: Delegate bounded tasks to configured external-model workers in Codex Desktop through an atomic workspace mailbox. Use for legacy deepseek_worker agents and manifest-selected model workers whose native task messages may not be visible to the provider.
 ---
 
 # Custom Subagent Delegation
 
-The skill ID is `codex-custom-agents`; the legacy `deepseek-delegation`
-install path is migrated by `scripts/migrate_skill.py` and is never installed
-as a second live skill. The selected worker may use DeepSeek, Claude, Gemini,
-or another configured model.
+The skill ID is `codex-custom-subagents`. The legacy `deepseek-delegation` and
+`codex-custom-agents` install paths are migrated by `scripts/migrate_skill.py`
+and are never installed as second live skills. The selected worker may use
+DeepSeek, Claude, Gemini, or another configured model.
 
 Use the native subagent channel for lifecycle and results. Use a workspace task pool for task bodies because an external model may not receive the native message or task name.
 

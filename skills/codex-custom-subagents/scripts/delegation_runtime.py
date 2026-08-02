@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Persist deterministic model fallback state for one delegation run."""
+"""Persist deterministic model fallback state for one custom-subagent run."""
 
 from __future__ import annotations
 

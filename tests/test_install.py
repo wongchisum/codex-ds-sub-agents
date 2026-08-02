@@ -61,6 +61,34 @@ def run_manifest_uninstall(codex_home: Path, manifest: Path) -> subprocess.Compl
 
 
 class InstallTests(unittest.TestCase):
+    def test_skill_install_ignores_python_cache_and_preserves_binary_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project_root = root / "project"
+            source = project_root / "skills" / install.SKILL_NAME
+            (source / "scripts" / "__pycache__").mkdir(parents=True)
+            (source / "SKILL.md").write_text("# Skill\n", encoding="utf-8")
+            (source / "scripts" / "worker.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (source / "assets").mkdir()
+            (source / "assets" / "sample.bin").write_bytes(b"\xff\x00\x80")
+            (source / "scripts" / "__pycache__" / "worker.cpython-313.pyc").write_bytes(
+                b"\xf3\r\r\ncache"
+            )
+            (source / ".DS_Store").write_bytes(b"finder")
+            codex_home = root / "codex-home"
+
+            with patch.object(install, "PROJECT_ROOT", project_root):
+                install.install_skill(codex_home)
+                install.install_skill(codex_home)
+
+            destination = codex_home / "skills" / install.SKILL_NAME
+            self.assertEqual(b"\xff\x00\x80", (destination / "assets" / "sample.bin").read_bytes())
+            self.assertFalse((destination / "scripts" / "__pycache__").exists())
+            self.assertFalse((destination / ".DS_Store").exists())
+            manifest = install.read_skill_manifest(destination / install.SKILL_MANIFEST)
+            self.assertIn("assets/sample.bin", manifest)
+            self.assertNotIn("scripts/__pycache__/worker.cpython-313.pyc", manifest)
+
     def test_adapter_service_start_failure_aborts_install(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             codex_home = Path(directory) / "codex-home"
@@ -390,7 +418,7 @@ class InstallTests(unittest.TestCase):
             ]
             self.assertEqual(1, len(real_headers))
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "codex-custom-agents" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-subagents" / "SKILL.md").is_file())
 
     def test_codex_home_falls_back_when_env_is_blank(self) -> None:
         with patch.dict(os.environ, {"CODEX_HOME": "   "}):
@@ -453,7 +481,7 @@ class InstallTests(unittest.TestCase):
             codex_home = root / "codex-home"
             codex_home.mkdir()
             (codex_home / "skills").mkdir()
-            (codex_home / "skills" / "codex-custom-agents").symlink_to(outside, target_is_directory=True)
+            (codex_home / "skills" / "codex-custom-subagents").symlink_to(outside, target_is_directory=True)
 
             result = run_install(codex_home)
 
@@ -509,7 +537,7 @@ class InstallTests(unittest.TestCase):
             codex_home = Path(directory) / "codex-home"
             first = run_install(codex_home)
             self.assertEqual(0, first.returncode, first.stderr)
-            skill_dest = codex_home / "skills" / "codex-custom-agents"
+            skill_dest = codex_home / "skills" / "codex-custom-subagents"
             manifest_path = skill_dest / install.SKILL_MANIFEST
             manifest = install.json.loads(manifest_path.read_text(encoding="utf-8"))
             stale = skill_dest / "obsolete.txt"

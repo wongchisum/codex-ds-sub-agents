@@ -34,6 +34,8 @@ test output.
   Task Scheduler/Credential Manager. Windows branches have simulated tests only.
 - Configure phases, adapter audit/output tails, mailbox receipts, and runtime
   state can be exported in a bounded redacted diagnostic bundle.
+- Skill packaging ignores interpreter/OS caches and copies valid binary assets
+  without decoding them as text, so repeated installs are Python-version safe.
 
 ## Automated results
 
@@ -45,12 +47,13 @@ test output.
 | Custom install and doctor | PASS | isolated Codex home, strict config loaded |
 | Windows platform simulation | PASS | win32 import, Task Scheduler XML/lifecycle mocks, `msvcrt` lock dispatch, dynamic Python/path rendering |
 | Credential and diagnostics | PASS | native-store boundary, configure JSONL redaction, bounded diagnostic zip with task/config exclusions |
-| Full automated suite | PASS | 279 tests discovered on Python 3.9; 276 passed and 3 TOML checks skipped |
+| Full automated suite | PASS | 301 passed on Python 3.13; Python 3.9 passed 298 and skipped 3 TOML checks |
 | Python compilation | PASS | bytecode cache redirected to `/private/tmp` |
 
-The plugin manifest was also validated with the Codex plugin validator after the
-project rename. This report retains older endpoint and session evidence below;
-historical local paths are evidence, not current product names.
+The plugin manifest and `$codex-custom-subagents` Skill were also validated with
+their Codex validators after the project rename. This report retains older
+endpoint and session evidence below; historical local paths are evidence, not
+current product names.
 
 ## Endpoint discovery
 

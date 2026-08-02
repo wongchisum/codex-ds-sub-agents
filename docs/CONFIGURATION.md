@@ -1,29 +1,31 @@
-# 模型与 fallback 配置
+# Model and fallback configuration
 
-## 内置模型-协议选择
+English · [简体中文](zh-CN/CONFIGURATION.md)
+
+## Built-in model/protocol presets
 
 ```bash
 python3 scripts/configure.py --list-model-protocols
 ```
 
-| CLI 名称 | 显示名称 | 上游协议 |
+| CLI name | Display name | Upstream protocol |
 | --- | --- | --- |
 | `deepseek-anthropic` | deepseek (anthropic) | `anthropic_messages` |
 | `deepseek-openai` | deepseek (openai) | `openai_responses` |
 | `gemini-anthropic` | gemini (anthropic) | `anthropic_messages` |
 | `claude-anthropic` | claude (anthropic) | `anthropic_messages` |
 
-显示名称只是便捷预设。Provider 的真实抽象仍是 `upstream_protocol`，模型名称不会决定协议。
+Preset names are conveniences. `upstream_protocol` defines the actual provider protocol; a model name never selects a protocol.
 
-## primary 与 fallback
+## Primary and fallbacks
 
-只配置 primary：
+Primary only:
 
 ```bash
 python3 scripts/configure.py --primary deepseek-anthropic
 ```
 
-按顺序添加 fallback：
+Ordered fallbacks:
 
 ```bash
 python3 scripts/configure.py \
@@ -32,15 +34,15 @@ python3 scripts/configure.py \
   --fallback deepseek-openai
 ```
 
-primary 和 fallback 不能重复。`max_switches` 由 fallback 数量生成。每批 sub-agent 始终使用同一个 active agent；fallback 是父任务在合格故障后启动新批次，不是在同一批次混用多个模型。
+The primary and fallbacks must be unique. `max_switches` is derived from the number of fallbacks. Every running worker batch uses one active agent; after an eligible exhausted failure, the parent starts a replacement batch with the next fallback.
 
-## 自定义 manifest
+## Custom manifest
 
-内置预设不满足需求时，复制 `config/*.example.json` 并修改以下字段：
+Copy a `config/*.example.json` file to the ignored `config/*.local.json` pattern and configure:
 
-- Provider：`base_url`、`upstream_protocol`、认证引用、重试和本机 adapter 端口。
-- Model：`remote_model`、`agent`、上下文声明、输出上限和工具能力。
-- Selection：一个 `primary`、有序 `fallbacks` 和允许切换次数。
+- Provider: `base_url`, `upstream_protocol`, credential reference, retry policy, and local adapter port.
+- Model: `remote_model`, `agent`, context declarations, output limit, and tool capabilities.
+- Selection: one `primary`, ordered `fallbacks`, and `max_switches`.
 
 ```bash
 python3 scripts/configure.py \
@@ -48,8 +50,10 @@ python3 scripts/configure.py \
   --name my-team
 ```
 
-manifest 只能保存凭证引用，不能保存 API Key。支持 `keychain` 和 `env` 引用。Anthropic Messages Provider 会经本机 adapter 转成 Codex 当前使用的 Responses 协议；多个 adapter 必须使用不同监听端口。
+The manifest may contain credential references, never credential values. Supported references are `keychain`, `env`, and `env_header`. Anthropic Messages providers are converted to the Responses protocol through a local adapter; each adapter needs a unique listen port.
 
-## 旧入口
+## Non-interactive use
 
-`--profile` 暂时保留旧脚本兼容，不再作为新用户的主要配置入口。`claude-gemini` 这类把 fallback 写进 profile 名称的组合不会新增；新配置必须把 fallback 单独声明。
+Codex and CI should always pass one of `--primary`, `--manifest`, or the compatibility-only `--profile` option. Without an explicit source, `configure.py` refuses to guess when stdin is not interactive.
+
+`--profile` remains for old scripts. New configurations declare the primary and fallbacks separately instead of encoding fallback choices in a profile name.

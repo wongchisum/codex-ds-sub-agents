@@ -1,80 +1,76 @@
-# 实现原理
+# Implementation
 
-## 从配置到 worker
+English · [简体中文](zh-CN/IMPLEMENTATION.md)
 
-1. `configure.py` 选择预设或接收自定义 manifest，并把经过校验的副本保存到稳定用户目录。
-2. `load_manifest()` 严格解析 JSON，拒绝未知协议、非法 URL、内联凭证、重复 ID 和不完整 selection。
-3. 配置入口通过 macOS Keychain 或 Windows Credential Manager 检查凭证引用；缺少时在安装前返回 exit 3，不把凭证值写入参数、manifest 或日志。
-4. 安装器为每个模型渲染独立 catalog 和 agent TOML，为每个 Provider 渲染 `config.toml` 块。
-5. 安装器写入 `subagent-selection.json`，把 model ID 映射到真实 agent、provider、remote model 和上下文声明。
-6. `upstream_protocol=anthropic_messages` 时，安装器推导 adapter，并通过 macOS LaunchAgent 或 Windows Task Scheduler 启动带固定 Provider 身份的服务。
-7. 凭证齐全后自动运行 doctor。用户新建 Codex 任务，skill 再通过 `delegation_runtime.py begin` 取得唯一的 `active.agent`。
+## From configuration to a worker
 
-## 任务正文为什么使用文件
+1. `configure.py` selects a preset or accepts a custom manifest and stores a validated copy in a stable user directory.
+2. `load_manifest()` rejects unknown protocols, invalid URLs, inline credentials, duplicate IDs, and incomplete selection.
+3. Configure checks macOS Keychain, Windows Credential Manager, or environment references. A missing credential stops the workflow with exit code 3 before runtime files are installed.
+4. The installer renders one catalog and agent TOML per model and one `config.toml` provider block per provider.
+5. It writes `subagent-selection.json`, mapping model IDs to agent, provider, remote model, and context declarations.
+6. For `upstream_protocol=anthropic_messages`, it derives a local adapter and installs a macOS LaunchAgent or Windows Task Scheduler task bound to that provider identity.
+7. Configure runs doctor. The user then starts a new Codex task, where the Skill calls `delegation_runtime.py begin` to resolve the single `active.agent`.
 
-自定义 provider 的原生父子消息在部分 Desktop 版本和协议组合中无法稳定携带完整任务正文。任务正文如果只存在于 spawn message，worker 可能收到空任务或只有加密块。
+## Why task bodies use files
 
-父任务因此先写入完整任务文件，再创建 worker。文件协议头保持 `# DeepSeek task handoff v1`，这是兼容标识，不代表模型必须是 DeepSeek。改头会让旧任务文件被拒绝，所以项目改名不修改协议 v1。
+In some Codex Desktop and provider/protocol combinations, the native parent-to-child message does not reliably carry the full subtask body. A worker may otherwise receive an empty task or only an encrypted block.
 
-领取时：
+The parent writes the complete handoff before spawning. The protocol header remains `# DeepSeek task handoff v1` for compatibility; it does not require a DeepSeek model.
 
 ```text
-验证真实 cwd
-  → 锁定任务池
-  → 验证 pending 协议头和 task_id
-  → 原子 rename 到 claimed/<task_id>--<claim_id>.md
-  → 持久化 receipt
-  → 返回 task_id、claim_id、path、receipt
+validate real cwd
+  → lock the mailbox
+  → validate pending header and task ID
+  → atomically rename to claimed/<task_id>--<claim_id>.md
+  → persist receipt
+  → return task_id, claim_id, path, and receipt
 ```
 
-receipt 记录 `attempt_id`、时间、状态、退出码，以及可空的 parent/worker thread、agent、model、provider。`complete` 和 `fail` 只能更新同一 `task_id + claim_id` 的准确 attempt。
+The receipt stores an attempt ID, timestamps, status, exit code, and optional explicit parent/worker thread, agent, model, and provider metadata. `complete` and `fail` update only the exact `task_id + claim_id` attempt.
 
-follow-up 必须先更新已经领取的文件，再唤醒同一个 worker。父任务不能靠 glob 猜 claimed 路径。
+A follow-up updates the claimed file before waking the same worker. The parent never reconstructs a claimed path with an ambiguous glob.
 
-## fallback 状态机
+## Fallback state machine
 
-每个运行在 `runs/<run-id>.json` 保存：
+Each `runs/<run-id>.json` stores:
 
-- 当前 model 与 agent
-- 已尝试模型集合
-- generation，从 1 开始
-- 已切换次数与 `max_switches`
-- 原始失败分类和最终 outcome
+- current model and agent;
+- attempted models;
+- generation, starting at 1;
+- switches used and `max_switches`;
+- failure classification and final outcome.
 
-`record-failure` 只有在 transport retry 已耗尽后调用。状态机分类错误并决定 `switched` 或 `blocked`。切换前必须确认旧 worker 已停止，否则两个模型可能同时修改同一任务。
+The parent calls `record-failure` only after provider transport retries are exhausted. Before switching, it confirms every old worker stopped. Completed work stays accepted; only incomplete claims are recovered. Accepted runs finish with `--outcome completed`, while an ineligible or exhausted failure finishes as `blocked`.
 
-成功结果保留；只恢复未完成的 claim。运行验收后用 `finish --outcome completed` 关闭，无法切换的错误用 `blocked`。
+## Atomic installation and rollback
 
-## 安装与回滚
+Managed files are written to a same-directory temporary file, flushed, and atomically replaced. Changed targets receive a timestamped backup. If a newly installed adapter fails to start, service management stops the new job and removes only the matching definition it created.
 
-所有文件写入都先在目标目录创建临时文件、`fsync`，再用 `os.replace` 原子替换。已有文件变化时先备份。安装中途启动 adapter 失败，服务管理器停止刚启动的 job，并只删除本次创建且内容仍匹配的 plist。
+Resource digests prevent two unsafe behaviors:
 
-登记表的资源摘要解决两个问题：
+- Uninstall does not delete a managed file after the user changes it.
+- Removing one manifest does not delete a shared Skill or adapter still owned by another installation.
 
-- 用户修改托管文件后，卸载不会覆盖或删除用户内容。
-- 多个 manifest 使用相同 skill/adapter 时，移除一个 owner 不会破坏另一个安装。
+A provider ID with drifted URL, authentication, protocol, or adapter settings fails instead of silently reusing the wrong upstream configuration.
 
-同名 Provider 配置漂移直接失败。静默复用旧 URL 或旧认证会让 selection 看似切换成功，实际请求仍打到错误上游。
+## Adapter identity and audit
 
-## adapter 服务身份
+The health response includes `service_id`, adapter type, and a fingerprint bound to the provider ID and upstream URL. Install and doctor therefore reject an old adapter or unrelated process that happens to answer on the expected port.
 
-健康响应包含 `service_id`、adapter 类型和 fingerprint。fingerprint 绑定 Provider ID 与真实上游 URL。安装器和 doctor 不只检查端口是否返回 200；旧服务或占用端口的其他进程无法冒充正确 adapter。
+Audit JSONL contains request ID, model, requested/effective token limit, status, error category, duration, and upstream usage. It excludes prompts and credentials.
 
-审计 JSONL 只记录 request ID、模型、请求与实际 token 上限、状态、错误类别、耗时和上游 usage。Prompt 与凭证不进入审计。
+## Worker tool boundary
 
-## 工具边界
+External-model workers retain local repository tools such as command execution, stdin, planning, and freeform patch application. They do not receive:
 
-外部模型 worker 保留仓库工作需要的本地工具，例如 `exec_command`、`write_stdin`、`update_plan` 和 freeform `apply_patch`。以下能力不会下发：
+- subagent creation, which prevents recursive delegation;
+- `request_user_input`, because blockers return to the parent;
+- built-in web search or image tools, which have no current cross-provider mapping.
 
-- 创建 sub-agent：避免递归委派和失控并发。
-- `request_user_input`：worker 必须把阻塞返回父任务。
-- 内置 web search 与图像工具：当前没有跨供应商协议映射。
+## Verify the actual context window
 
-这不是模型本身缺少工具，而是父任务对子任务权限的明确限制。
-
-## 上下文核验
-
-安装时的 `context_window` 和 `max_context_window` 只生成 catalog 元数据。真实 Desktop session 可能被客户端、模型目录或服务端限制为更小窗口。
+Catalog `context_window` values are declarations. The Desktop client, model catalog, or service may enforce a smaller runtime window.
 
 ```bash
 python3 scripts/session_audit.py \
@@ -82,4 +78,4 @@ python3 scripts/session_audit.py \
   --selection ~/.codex/models/subagent-selection.json
 ```
 
-审计输出同时给出 declared 和 `task_started.model_context_window`，并标记首轮非空结果、follow-up、最后输出 token 与原生错误。当前一次 1M catalog 测试的实际窗口是 `258400`，因此不能声称已经获得 1M 原生 sub-agent 上下文。
+The audit reports declared values beside `task_started.model_context_window`, follow-ups, output tokens, and native errors. One existing catalog declared 1M while the observed Desktop window was `258400`; do not present the catalog value as an observed runtime limit.

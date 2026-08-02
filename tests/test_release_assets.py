@@ -21,6 +21,19 @@ except ModuleNotFoundError:  # Python < 3.11
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MINIMAL_CLIENT_VERSION = "0.146.0"
 TOML_REASON = "tomllib requires Python 3.11+; CI runs 3.11"
+BILINGUAL_DOCS = (
+    "ARCHITECTURE.md",
+    "CONFIGURATION.md",
+    "IMPLEMENTATION.md",
+    "INSTALLATION.md",
+    "MIGRATION.md",
+    "MODEL_ADAPTERS.md",
+    "PROMPT_INSTALLATION.md",
+    "README.md",
+    "TESTING.md",
+    "TROUBLESHOOTING.md",
+    "WINDOWS_TESTING.md",
+)
 
 
 def load_model_catalog() -> dict:
@@ -76,43 +89,76 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertIn("claim_task.py", parsed["developer_instructions"])
 
     def test_skill_frontmatter_is_valid(self) -> None:
-        skill = PROJECT_ROOT / "skills" / "codex-custom-agents" / "SKILL.md"
+        skill = PROJECT_ROOT / "skills" / "codex-custom-subagents" / "SKILL.md"
         self.assertTrue(skill.is_file())
         match = re.match(r"^---\n(.*?)\n---\n", skill.read_text(encoding="utf-8"), re.DOTALL)
         self.assertIsNotNone(match, "SKILL.md must start with YAML frontmatter")
         frontmatter = match.group(1)
-        self.assertIn("name: codex-custom-agents", frontmatter)
+        self.assertIn("name: codex-custom-subagents", frontmatter)
         description = re.search(r"^description: (.+)$", frontmatter, re.MULTILINE)
         self.assertIsNotNone(description, "frontmatter must have a description")
         self.assertTrue(description.group(1).strip())
         self.assertTrue(
-            (PROJECT_ROOT / "skills" / "codex-custom-agents" / "scripts" / "claim_task.py").is_file()
+            (PROJECT_ROOT / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py").is_file()
         )
         interface = (
-            PROJECT_ROOT / "skills" / "codex-custom-agents" / "agents" / "openai.yaml"
+            PROJECT_ROOT / "skills" / "codex-custom-subagents" / "agents" / "openai.yaml"
         ).read_text(encoding="utf-8")
         self.assertIn('display_name: "Custom Subagent Delegation"', interface)
+        self.assertIn("$codex-custom-subagents", interface)
+        self.assertFalse((PROJECT_ROOT / "skills" / "codex-custom-agents").exists())
 
     def test_minimum_version_is_consistent_across_repo(self) -> None:
         self.assertEqual(MINIMAL_CLIENT_VERSION, load_model_catalog()["models"][0]["minimal_client_version"])
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-        readme_en = (PROJECT_ROOT / "README_EN.md").read_text(encoding="utf-8")
+        readme_zh = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
         self.assertIn(MINIMAL_CLIENT_VERSION, readme)
-        self.assertIn(MINIMAL_CLIENT_VERSION, readme_en)
+        self.assertIn(MINIMAL_CLIENT_VERSION, readme_zh)
         self.assertNotIn("0.144.0", readme)
-        self.assertNotIn("0.144.0", readme_en)
+        self.assertNotIn("0.144.0", readme_zh)
 
     def test_readmes_cross_link_and_reference_existing_screenshot(self) -> None:
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-        readme_en = (PROJECT_ROOT / "README_EN.md").read_text(encoding="utf-8")
+        readme_zh = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
         screenshot = PROJECT_ROOT / "assets" / "codex-custom-subagents.png"
 
-        self.assertIn("[English](README_EN.md)", readme)
-        self.assertIn("[中文](README.md)", readme_en)
+        self.assertFalse((PROJECT_ROOT / "README_EN.md").exists())
+        self.assertIn("English · [简体中文](README.zh-CN.md)", readme)
+        self.assertIn("[English](README.md) · 简体中文", readme_zh)
         self.assertIn("assets/codex-custom-subagents.png", readme)
-        self.assertIn("assets/codex-custom-subagents.png", readme_en)
+        self.assertIn("assets/codex-custom-subagents.png", readme_zh)
         self.assertTrue(screenshot.is_file())
         self.assertEqual(b"\x89PNG\r\n\x1a\n", screenshot.read_bytes()[:8])
+
+    def test_readmes_lead_with_codex_prompts_before_features(self) -> None:
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        readme_zh = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+
+        self.assertIn("helps Codex Desktop use custom model providers as subagents", readme)
+        self.assertLess(readme.index("## Ask Codex to install it"), readme.index("## Features"))
+        self.assertLess(readme.index("## Use it in Codex"), readme.index("## Features"))
+        self.assertIn("帮助 Codex Desktop 使用自定义模型 Provider 作为 subagent", readme_zh)
+        self.assertLess(readme_zh.index("## 让 Codex 安装"), readme_zh.index("## 特性"))
+        self.assertLess(readme_zh.index("## 在 Codex 中使用"), readme_zh.index("## 特性"))
+
+    def test_documentation_defaults_to_english_with_chinese_mirrors(self) -> None:
+        for name in BILINGUAL_DOCS:
+            english_path = PROJECT_ROOT / "docs" / name
+            chinese_path = PROJECT_ROOT / "docs" / "zh-CN" / name
+            self.assertTrue(english_path.is_file(), english_path)
+            self.assertTrue(chinese_path.is_file(), chinese_path)
+            self.assertIn(
+                f"[简体中文](zh-CN/{name})",
+                english_path.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                f"[English](../{name})",
+                chinese_path.read_text(encoding="utf-8"),
+            )
+
+        docs_index = (PROJECT_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("helps Codex Desktop use custom model providers as subagents", docs_index)
+        self.assertLess(docs_index.index("## Start with Codex"), docs_index.index("## Install and configure"))
 
     def test_plugin_manifest_uses_custom_subagents_name(self) -> None:
         manifest_path = PROJECT_ROOT / ".codex-plugin" / "plugin.json"
@@ -120,8 +166,17 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertEqual("codex-custom-subagents", manifest["name"])
         self.assertEqual("Codex Custom Subagents", manifest["interface"]["displayName"])
         self.assertEqual("./skills/", manifest["skills"])
+        self.assertIn(
+            "$codex-custom-subagents",
+            " ".join(manifest["interface"]["defaultPrompt"]),
+        )
+        self.assertIn("Codex Desktop subagents", manifest["description"])
+        self.assertEqual(
+            "Run Codex tasks with custom subagents.",
+            manifest["interface"]["shortDescription"],
+        )
 
-        for readme_name in ("README.md", "README_EN.md"):
+        for readme_name in ("README.md", "README.zh-CN.md"):
             readme = (PROJECT_ROOT / readme_name).read_text(encoding="utf-8")
             self.assertIn("Codex Custom Subagents", readme)
             self.assertNotIn("github.com/wongchisum/codex-ds-sub-agents", readme)
@@ -145,7 +200,7 @@ class ReleaseAssetTests(unittest.TestCase):
         compile(source, str(configure), "exec")
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("python3 scripts/configure.py --primary", readme)
-        self.assertIn("让 Codex 帮你安装和配置", readme)
+        self.assertIn("Ask Codex to install it", readme)
         self.assertIn(
             "/config/*.local.json",
             (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8"),

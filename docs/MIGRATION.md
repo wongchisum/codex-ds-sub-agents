@@ -1,48 +1,48 @@
-# Skill 迁移
+# Skill migration
 
-项目和插件仍叫 `codex-custom-subagents`。面向 Prompt 的 Skill 已从 `$deepseek-delegation` 改为 `$codex-custom-agents`，新安装路径是 `~/.codex/skills/codex-custom-agents/`。
+English · [简体中文](zh-CN/MIGRATION.md)
 
-## 自动迁移
+The project, plugin, and active Skill are all named `codex-custom-subagents`. Older releases used `$deepseek-delegation`, followed by `$codex-custom-agents`. New installs use `~/.codex/skills/codex-custom-subagents/`.
 
-在仓库根目录运行：
+## Managed migration
+
+macOS:
 
 ```bash
 python3 scripts/migrate_skill.py --dry-run
 python3 scripts/migrate_skill.py
 ```
 
-Windows 使用：
+Windows:
 
 ```powershell
 py -3 scripts\migrate_skill.py --dry-run
 py -3 scripts\migrate_skill.py
 ```
 
-迁移器会：
+The migrator:
 
-1. 查找 `~/.codex/skills/deepseek-delegation/`。
-2. 读取旧安装的 `.codex-deepseek-manifest.json` 所有权清单。
-3. 只移除摘要仍匹配的受管理文件。
-4. 保留用户修改文件、未知文件、符号链接和未受管理的旧目录。
-5. 安装 `codex-custom-agents`，并重新渲染 agent 路径。
+1. Looks for `~/.codex/skills/deepseek-delegation/` and `~/.codex/skills/codex-custom-agents/`.
+2. Reads each old `.codex-deepseek-manifest.json` ownership record.
+3. Removes only managed files whose digest still matches.
+4. Preserves modified files, unknown files, symlinks, and unmanaged directories.
+5. Installs `codex-custom-subagents` and re-renders registered agent paths.
 
-迁移可重复运行。未受管理的旧目录不会被强制删除，需要用户检查并自行决定如何处理。
+Migration is idempotent. An unmanaged old directory is reported and preserved for manual review.
 
-## 不再兼容的入口
+## Compatibility boundary
 
-迁移后不提供 `$deepseek-delegation` 同名别名。文档、Prompt 和新任务统一使用 `$codex-custom-agents`。保留两个并行 Skill 会让 Codex 选择错误入口，也会使后续卸载所有权不清晰。
+New prompts and tasks must use `$codex-custom-subagents`; no active alias is installed for either legacy name.
 
-`.deepseek-delegations/`、`# DeepSeek task handoff v1` 和 `.codex-deepseek-manifest.json` 暂不改名。前两项属于现有任务文件协议，最后一项用于识别旧安装所有权；直接改名会破坏未完成任务或使安全卸载失去依据。
+The names `.deepseek-delegations/`, `# DeepSeek task handoff v1`, and `.codex-deepseek-manifest.json` intentionally remain unchanged. They identify the existing mailbox protocol and old ownership records. Renaming them would break in-flight tasks or safe uninstall detection.
 
-## 任务缓存
+## Start a new Codex task
 
-安装或迁移完成后必须关闭当前 Codex 任务并新建任务。旧任务缓存的 agent 注册表不会热更新，可能返回 `unknown agent_type`。该错误不是模型网络故障，不能触发 fallback。
+After installation or migration, close the current Codex task and start a new task. An open task keeps the agent registry loaded at task creation and can return `unknown agent_type`. This is a local task-lifecycle error, not an eligible model fallback failure.
 
-## 第一版模型配置
+## Old repository clones
 
-旧 `deepseek_worker` agent、旧 provider 和旧 Keychain service 可以由安装器识别，但新配置推荐使用 schema v2 manifest。`--profile` 仍供旧脚本兼容；新的用户流程使用 `--primary` 和独立的 `--fallback`。
-
-远端仓库改名后的旧 clone 可手工更新 remote：
+An old clone can update its remote explicitly:
 
 ```bash
 git remote set-url origin https://github.com/wongchisum/codex-custom-subagents.git

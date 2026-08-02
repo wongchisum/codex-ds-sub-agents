@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform advisory file lock with identical semantics on POSIX and Windows.
+"""Cross-platform advisory lock for Codex Custom Subagents task pools.
 
 POSIX uses ``fcntl.flock``; Windows uses ``msvcrt.locking`` byte-range locks on
 an open file. Both backends serialize the same mailbox paths, so a mixed

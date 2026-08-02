@@ -16,11 +16,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Sequence
 
-from install import atomic_write, resolve_codex_home
+from install import SKILL_NAME, atomic_write, resolve_codex_home
 from credential_store import credential_exists, validate_identity
 from diagnostics import redact_text
 from model_manifest import ModelManifest, load_manifest
 from model_selection import ValidationError
+from platform_runtime import python_command, quote_windows_command
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -390,11 +391,16 @@ def print_credential_instructions(missing: Sequence[MissingCredential]) -> None:
     for credential in missing:
         if credential.kind == "keychain":
             if platform.system() == "Windows":
-                print(
-                    f'python "{PROJECT_ROOT / "scripts" / "credential_store.py"}" set '
-                    f"--account {shlex.quote(credential.account)} "
-                    f"--service {shlex.quote(credential.name)}"
+                command = (
+                    python_command(),
+                    str(PROJECT_ROOT / "scripts" / "credential_store.py"),
+                    "set",
+                    "--account",
+                    credential.account,
+                    "--service",
+                    credential.name,
                 )
+                print(quote_windows_command(command))
             else:
                 print(
                     "/usr/bin/security add-generic-password -U "
@@ -407,6 +413,16 @@ def print_credential_instructions(missing: Sequence[MissingCredential]) -> None:
                 f"{credential.name!r} in the adapter service environment."
             )
     print("Do not paste API keys into a Codex prompt. Re-run the same configure command afterward.")
+
+
+def print_new_task_instructions() -> None:
+    """Explain the task boundary required for newly installed agent types."""
+    print("Close this Codex task and start a NEW Codex task before delegation.")
+    print(
+        "The current task cannot reload newly installed agent types and may return "
+        "'unknown agent_type'."
+    )
+    print(f"In the new task, use ${SKILL_NAME}; it reads the active model selection.")
 
 
 def run_command(
@@ -573,6 +589,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.skip_doctor:
         print("installation completed; doctor was skipped")
+        print_new_task_instructions()
         return 0
 
     print("\nRunning installation doctor...", flush=True)
@@ -591,9 +608,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return checked
 
     log_event(log_path, "configure_completed", exit_code=0)
-    print("\nSetup completed. Start a new Codex task so Desktop loads the installed agent types.")
+    print("\nSetup completed.")
+    print_new_task_instructions()
     print(f"Diagnostic log: {log_path}")
-    print("Then use $codex-custom-agents; the skill reads the active model selection.")
     return 0
 
 
