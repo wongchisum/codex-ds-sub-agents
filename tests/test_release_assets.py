@@ -76,20 +76,20 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertIn("claim_task.py", parsed["developer_instructions"])
 
     def test_skill_frontmatter_is_valid(self) -> None:
-        skill = PROJECT_ROOT / "skills" / "deepseek-delegation" / "SKILL.md"
+        skill = PROJECT_ROOT / "skills" / "codex-custom-agents" / "SKILL.md"
         self.assertTrue(skill.is_file())
         match = re.match(r"^---\n(.*?)\n---\n", skill.read_text(encoding="utf-8"), re.DOTALL)
         self.assertIsNotNone(match, "SKILL.md must start with YAML frontmatter")
         frontmatter = match.group(1)
-        self.assertIn("name: deepseek-delegation", frontmatter)
+        self.assertIn("name: codex-custom-agents", frontmatter)
         description = re.search(r"^description: (.+)$", frontmatter, re.MULTILINE)
         self.assertIsNotNone(description, "frontmatter must have a description")
         self.assertTrue(description.group(1).strip())
         self.assertTrue(
-            (PROJECT_ROOT / "skills" / "deepseek-delegation" / "scripts" / "claim_task.py").is_file()
+            (PROJECT_ROOT / "skills" / "codex-custom-agents" / "scripts" / "claim_task.py").is_file()
         )
         interface = (
-            PROJECT_ROOT / "skills" / "deepseek-delegation" / "agents" / "openai.yaml"
+            PROJECT_ROOT / "skills" / "codex-custom-agents" / "agents" / "openai.yaml"
         ).read_text(encoding="utf-8")
         self.assertIn('display_name: "Custom Subagent Delegation"', interface)
 
@@ -144,7 +144,7 @@ class ReleaseAssetTests(unittest.TestCase):
         source = configure.read_text(encoding="utf-8")
         compile(source, str(configure), "exec")
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("python3 scripts/configure.py --profile", readme)
+        self.assertIn("python3 scripts/configure.py --primary", readme)
         self.assertIn("让 Codex 帮你安装和配置", readme)
         self.assertIn(
             "/config/*.local.json",

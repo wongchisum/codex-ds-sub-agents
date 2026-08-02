@@ -21,10 +21,12 @@ from typing import Iterable, Optional
 from install import (
     INSTALL_REGISTRY_VERSION,
     SKILL_MANIFEST,
+    SKILL_NAME,
     InstallError,
     atomic_write,
     manifest_installation_id,
     read_install_registry,
+    remove_managed_legacy_skill,
     resolve_codex_home,
     skill_manifest_bytes,
     write_install_registry,
@@ -109,8 +111,8 @@ def recorded_selection_bytes(record: dict[str, object]) -> bytes:
 
 
 def uninstall_skill(codex_home: Path, dry_run: bool) -> None:
-    source = PROJECT_ROOT / "skills" / "deepseek-delegation"
-    destination = codex_home / "skills" / "deepseek-delegation"
+    source = PROJECT_ROOT / "skills" / SKILL_NAME
+    destination = codex_home / "skills" / SKILL_NAME
     if not destination.exists():
         print(f"missing: {destination}")
         return
@@ -127,6 +129,12 @@ def uninstall_skill(codex_home: Path, dry_run: bool) -> None:
                 directory.rmdir()
         if destination.exists():
             print(f"preserved: {destination} (contains user files)")
+
+
+def uninstall_skills(codex_home: Path, dry_run: bool) -> None:
+    """Remove the current skill and any owned managed legacy skill install."""
+    uninstall_skill(codex_home, dry_run)
+    remove_managed_legacy_skill(codex_home, dry_run)
 
 
 def custom_agent_paths(codex_home: Path) -> set[Path]:
@@ -363,9 +371,9 @@ def uninstall_custom(
 
     legacy_agent = codex_home / "agents" / "deepseek-worker.toml"
     if legacy_agent.is_file() or remaining_records:
-        print("preserved (shared by another installation): deepseek-delegation skill")
+        print(f"preserved (shared by another installation): {SKILL_NAME} skill")
     else:
-        uninstall_skill(codex_home, dry_run)
+        uninstall_skills(codex_home, dry_run)
 
     remaining_provider_ids = {
         provider_id
@@ -419,13 +427,13 @@ def main() -> int:
         args.dry_run,
     )
     if custom_agent_paths(codex_home):
-        print("preserved (shared by another installation): deepseek-delegation skill")
+        print(f"preserved (shared by another installation): {SKILL_NAME} skill")
     else:
-        uninstall_skill(codex_home, args.dry_run)
+        uninstall_skills(codex_home, args.dry_run)
     status = uninstall_provider(codex_home, args.dry_run)
     print(f"{status}: {codex_home / 'config.toml'}")
 
-    print("next: reinstall with python3 scripts/install.py; config backups keep rollback copies")
+    print(f"next: reinstall with {sys.executable} scripts/install.py; config backups keep rollback copies")
     return 0
 
 

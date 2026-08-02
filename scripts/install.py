@@ -31,6 +31,9 @@ from platform_runtime import python_command, python_command_toml, toml_path_esca
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROVIDER_HEADER = "[model_providers.deepseek]"
+LEGACY_WORKER_AGENT = "deepseek_worker"
+SKILL_NAME = "codex-custom-agents"
+LEGACY_SKILL_NAME = "deepseek-delegation"
 SKILL_MANIFEST = ".codex-deepseek-manifest.json"
 INSTALL_REGISTRY = ".codex-subagent-installations.json"
 INSTALL_REGISTRY_VERSION = 1
@@ -471,9 +474,90 @@ def read_skill_manifest(path: Path) -> dict[str, str]:
     }
 
 
+def remove_owned_skill_files(
+    destination: Path,
+    manifest: dict[str, str],
+    dry_run: bool = False,
+) -> tuple[list[Path], list[Path]]:
+    """Remove only files whose digest matches the recorded skill manifest.
+
+    Returns (removed, preserved). Symlinks, missing files, and any file whose
+    content changed are preserved; directories are left untouched here.
+    """
+    removed: list[Path] = []
+    preserved: list[Path] = []
+    for relative, expected_digest in manifest.items():
+        path = destination / relative
+        if path.is_symlink():
+            preserved.append(path)
+            continue
+        if not path.is_file():
+            continue
+        if file_digest(path) != expected_digest:
+            preserved.append(path)
+            continue
+        if dry_run:
+            print(f"would remove: {path}")
+        else:
+            path.unlink()
+            print(f"removed: {path}")
+        removed.append(path)
+    return removed, preserved
+
+
+def prune_empty_directories(destination: Path, dry_run: bool = False) -> None:
+    for directory in [
+        *sorted(destination.rglob("*"), key=lambda path: len(path.parts), reverse=True),
+        destination,
+    ]:
+        if directory.is_dir() and not directory.is_symlink():
+            try:
+                if not any(directory.iterdir()):
+                    if dry_run:
+                        print(f"would remove empty directory: {directory}")
+                    else:
+                        directory.rmdir()
+                        print(f"removed empty directory: {directory}")
+            except OSError:
+                pass
+
+
+def remove_managed_legacy_skill(codex_home: Path, dry_run: bool = False) -> str | None:
+    """Remove an owned managed `deepseek-delegation` skill install.
+
+    Only files recorded in the legacy install's own
+    ``.codex-deepseek-manifest.json`` and unchanged since install are removed.
+    Unknown, modified, or symlinked paths are preserved. Returns the legacy
+    destination when it exists (it may remain with preserved user files) or
+    None when nothing legacy is installed.
+    """
+    destination = codex_home / "skills" / LEGACY_SKILL_NAME
+    if not destination.exists():
+        return None
+    if destination.is_symlink():
+        print(f"preserved (symlink): {destination}")
+        return str(destination)
+    if not destination.is_dir():
+        print(f"preserved (not a directory): {destination}")
+        return str(destination)
+    manifest_path = destination / SKILL_MANIFEST
+    manifest = read_skill_manifest(manifest_path)
+    if not manifest:
+        print(f"preserved (no managed manifest): {destination}")
+        return str(destination)
+    removed, preserved = remove_owned_skill_files(destination, manifest, dry_run)
+    if not dry_run and manifest_path.is_file() and not manifest_path.is_symlink():
+        manifest_path.unlink()
+        print(f"removed: {manifest_path}")
+    prune_empty_directories(destination, dry_run)
+    print(f"legacy skill: removed {len(removed)} owned file(s), preserved {len(preserved)}")
+    return str(destination)
+
+
 def install_skill(codex_home: Path) -> None:
-    source = PROJECT_ROOT / "skills" / "deepseek-delegation"
-    destination = codex_home / "skills" / "deepseek-delegation"
+    remove_managed_legacy_skill(codex_home)
+    source = PROJECT_ROOT / "skills" / SKILL_NAME
+    destination = codex_home / "skills" / SKILL_NAME
     ensure_not_symlink(destination)
     manifest_path = destination / SKILL_MANIFEST
     previous_files = read_skill_manifest(manifest_path)
@@ -694,6 +778,28 @@ def install_custom_manifest(
             ) from error
         raise InstallError(f"installation registry activation failed: {error}") from error
     print(f"installed: {selection_path}")
+    installed_agents = ", ".join(sorted({model.agent for model in manifest.models.values()}))
+    print(f"installed agents: {installed_agents}")
+
+
+
+def install_legacy_profile(codex_home: Path) -> None:
+    """Install the built-in DeepSeek skill, worker agent, catalog, and provider."""
+    install_skill(codex_home)
+    install_file(
+        PROJECT_ROOT / "agents" / "deepseek-worker.toml.template",
+        codex_home / "agents" / "deepseek-worker.toml",
+        {
+            "__CODEX_HOME__": toml_path_escape(str(codex_home)),
+            "__PYTHON_COMMAND__": python_command_toml(),
+        },
+    )
+    install_file(
+        PROJECT_ROOT / "models" / "deepseek-v4-flash.json",
+        codex_home / "models" / "deepseek-v4-flash.json",
+    )
+    install_provider(codex_home)
+
 
 
 def main() -> int:
@@ -708,29 +814,27 @@ def main() -> int:
                 start_adapters=not args.no_start_adapters,
             )
             print(
-                "next: store credentials in their configured secure source, run "
-                "scripts/doctor.py with the same --manifest, then start a new Codex task"
+                "next: store credentials in their configured secure source, then run "
+                "scripts/doctor.py with the same --manifest to verify the installation. "
+                "This task cached its agent registry at startup and cannot reload the "
+                "newly installed agents, so close it and open a NEW Codex task. In the "
+                "new task, verify the installed agent types above are loaded before "
+                "running delegation; otherwise delegation fails with 'unknown agent_type'."
             )
             return 0
-        install_skill(codex_home)
-        install_file(
-            PROJECT_ROOT / "agents" / "deepseek-worker.toml.template",
-            codex_home / "agents" / "deepseek-worker.toml",
-            {
-                "__CODEX_HOME__": toml_path_escape(str(codex_home)),
-                "__PYTHON_COMMAND__": python_command_toml(),
-            },
-        )
-        install_file(
-            PROJECT_ROOT / "models" / "deepseek-v4-flash.json",
-            codex_home / "models" / "deepseek-v4-flash.json",
-        )
-        install_provider(codex_home)
+        install_legacy_profile(codex_home)
     except (InstallError, ValidationError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
-    print("next: store the API key in macOS Keychain, run scripts/doctor.py, then start a new Codex task")
+    print(f"installed agents: {LEGACY_WORKER_AGENT}")
+    print(
+        "next: store the API key in macOS Keychain, then run scripts/doctor.py to "
+        "verify the installation. This task cached its agent registry at startup and "
+        "cannot reload the newly installed agent, so close it and open a NEW Codex "
+        f"task. In the new task, verify {LEGACY_WORKER_AGENT} is loaded before running "
+        "delegation; otherwise delegation fails with 'unknown agent_type'."
+    )
     return 0
 
 

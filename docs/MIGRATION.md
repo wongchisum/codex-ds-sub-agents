@@ -1,71 +1,50 @@
-# 名称迁移与兼容
+# Skill 迁移
 
-## 本次改名范围
+项目和插件仍叫 `codex-custom-subagents`。面向 Prompt 的 Skill 已从 `$deepseek-delegation` 改为 `$codex-custom-agents`，新安装路径是 `~/.codex/skills/codex-custom-agents/`。
 
-项目和插件的公开名称从 `Codex DeepSeek Subagents` 改为 `Codex Custom Subagents`，机器名称为 `codex-custom-subagents`。新的仓库地址按以下名称记录：
+## 自动迁移
 
-```text
-https://github.com/wongchisum/codex-custom-subagents
-```
-
-本地工作区目录不会由安装器自动移动，GitHub 仓库也不会由代码自动改名。完成远端仓库改名后，旧 clone 可以手工更新 remote。
-
-## 保留的兼容标识
-
-以下标识暂不改名：
-
-| 标识 | 保留原因 |
-| --- | --- |
-| `deepseek-delegation` | 已发布的 skill ID、旧 Prompt 和已安装路径依赖它 |
-| `.deepseek-delegations/` | 已有任务池和恢复记录依赖该目录 |
-| `# DeepSeek task handoff v1` | 任务文件协议版本；改名会拒绝旧 pending/claimed 文件 |
-| `.codex-deepseek-manifest.json` | 第一版 skill 卸载摘要 |
-| `deepseek_worker` | 第一版 agent 类型，旧 Desktop 任务会引用它 |
-| `deepseek-api-key` | 用户现有 Keychain service |
-| `[model_providers.deepseek]` | 第一版固定 provider 配置 |
-
-这些名称是兼容 API，不是新的产品定位。manifest 生成的 agent 和 provider 仍按用户配置命名。
-
-## 从第一版升级
-
-第一版固定 DeepSeek 安装可以与 manifest 安装共存：
-
-- 固定 catalog 是 `deepseek-v4-flash.json`。
-- manifest catalog 是 `<provider-id>--<model-id>.json`。
-- `subagent-selection.json` 存在时，skill 使用 selection 选择 agent。
-- selection 不存在时，skill 回退到 `deepseek_worker`。
-
-推荐顺序：
+在仓库根目录运行：
 
 ```bash
-# 1. 在旧仓库目录检查当前安装
-python3 scripts/doctor.py --skip-keychain
-
-# 2. 如果要移动仓库目录，先用原 manifest 预览并卸载 manifest 安装
-python3 scripts/uninstall.py --manifest /absolute/path/to/original.json --dry-run
-python3 scripts/uninstall.py --manifest /absolute/path/to/original.json
-
-# 3. 从新目录通过稳定配置入口重新安装
-python3 scripts/configure.py --profile claude-gemini
+python3 scripts/migrate_skill.py --dry-run
+python3 scripts/migrate_skill.py
 ```
 
-manifest installation ID 包含 manifest 绝对路径。直接移动目录后重装会产生新 ID，旧 owner 记录不会自动转移。
-新配置入口把 manifest 复制到 `~/.codex/custom-subagents/manifests/`，后续移动仓库不会再
-改变 installation ID。
+Windows 使用：
 
-## 已有任务与 Desktop 缓存
+```powershell
+py -3 scripts\migrate_skill.py --dry-run
+py -3 scripts\migrate_skill.py
+```
 
-安装或新增 agent 后必须新建 Codex 任务。旧任务缓存的 agent 注册表不会热更新，可能返回 `unknown agent_type`。这不是上游模型错误，请勿触发 fallback。
+迁移器会：
 
-已有 `.deepseek-delegations` 任务池无需改名。迁移前检查 `pending/` 与 `claimed/`，不要把未知任务带进新批次；确认没有 worker 运行后再执行恢复操作。
+1. 查找 `~/.codex/skills/deepseek-delegation/`。
+2. 读取旧安装的 `.codex-deepseek-manifest.json` 所有权清单。
+3. 只移除摘要仍匹配的受管理文件。
+4. 保留用户修改文件、未知文件、符号链接和未受管理的旧目录。
+5. 安装 `codex-custom-agents`，并重新渲染 agent 路径。
 
-## Git remote
+迁移可重复运行。未受管理的旧目录不会被强制删除，需要用户检查并自行决定如何处理。
 
-项目代码不会擅自修改外部 Git 状态。远端仓库实际改名后，用户可执行：
+## 不再兼容的入口
+
+迁移后不提供 `$deepseek-delegation` 同名别名。文档、Prompt 和新任务统一使用 `$codex-custom-agents`。保留两个并行 Skill 会让 Codex 选择错误入口，也会使后续卸载所有权不清晰。
+
+`.deepseek-delegations/`、`# DeepSeek task handoff v1` 和 `.codex-deepseek-manifest.json` 暂不改名。前两项属于现有任务文件协议，最后一项用于识别旧安装所有权；直接改名会破坏未完成任务或使安全卸载失去依据。
+
+## 任务缓存
+
+安装或迁移完成后必须关闭当前 Codex 任务并新建任务。旧任务缓存的 agent 注册表不会热更新，可能返回 `unknown agent_type`。该错误不是模型网络故障，不能触发 fallback。
+
+## 第一版模型配置
+
+旧 `deepseek_worker` agent、旧 provider 和旧 Keychain service 可以由安装器识别，但新配置推荐使用 schema v2 manifest。`--profile` 仍供旧脚本兼容；新的用户流程使用 `--primary` 和独立的 `--fallback`。
+
+远端仓库改名后的旧 clone 可手工更新 remote：
 
 ```bash
 git remote set-url origin https://github.com/wongchisum/codex-custom-subagents.git
 git remote -v
 ```
-
-在 GitHub 尚未创建或重命名仓库前不要执行，否则 pull/push 会指向不存在的地址。

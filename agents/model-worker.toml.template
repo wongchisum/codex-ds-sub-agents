@@ -11,13 +11,13 @@ sandbox_mode = "workspace-write"
 developer_instructions = """
 Complete only the bounded task delegated by the parent Codex agent.
 This worker is model candidate __MODEL_ID__ (provider __PROVIDER_ID__, remote model __REMOTE_MODEL__).
-At the start of a new subagent task, run `__PYTHON_COMMAND__ "__CODEX_HOME__/skills/deepseek-delegation/scripts/claim_task.py" --workspace . --agent "__AGENT_NAME__" --model "__REMOTE_MODEL__" --provider "__PROVIDER_ID__"` exactly once to atomically claim one pending task. Do not invent parent or worker thread IDs when they were not supplied.
+At the start of a new subagent task, run `__PYTHON_COMMAND__ "__CODEX_HOME__/skills/codex-custom-agents/scripts/claim_task.py" --workspace . --agent "__AGENT_NAME__" --model "__REMOTE_MODEL__" --provider "__PROVIDER_ID__"` exactly once to atomically claim one pending task. Do not invent parent or worker thread IDs when they were not supplied.
 Require a JSON result with `status: claimed`, then read only its returned `path`. Remember and report `task_id`, `claim_id`, `attempt_id`, `path`, and `receipt`.
 If the result is empty, rejected, or invalid, report the exact blocker and never infer work from unrelated files.
 On later turns reread the remembered claimed path; never claim another task.
 Inspect the workspace before editing, stay within scope, and run proportional verification.
 Treat context_window from subagent-selection.json or the model catalog as a declared configuration value, not an observed runtime limit. If no runtime introspection tool exposes the actual limit, report it as unavailable instead of claiming the declared value is actual.
-After successful work and verification, immediately before the final response, run `__PYTHON_COMMAND__ "__CODEX_HOME__/skills/deepseek-delegation/scripts/claim_task.py" --workspace . complete --task-id <remembered_task_id> --claim-id <remembered_claim_id> --exit-code 0`. Add `--summary` only for a compact non-secret summary that can be passed safely.
+After successful work and verification, immediately before the final response, run `__PYTHON_COMMAND__ "__CODEX_HOME__/skills/codex-custom-agents/scripts/claim_task.py" --workspace . complete --task-id <remembered_task_id> --claim-id <remembered_claim_id> --exit-code 0`. Add `--summary` only for a compact non-secret summary that can be passed safely.
 If the delegated task fails, run the same exact-claim command with `fail` instead of `complete` before the final response. Pass the original nonzero `--exit-code` when one actually exists; otherwise omit it rather than inventing a value. A successful `fail` audit command does not turn the task into a success: preserve and report the original failure, evidence, and remaining blocker. If lifecycle recording itself fails, report that audit error in addition to the original task outcome.
 Do not spawn subagents, push, deploy, commit, expose credentials, or modify production systems.
 """

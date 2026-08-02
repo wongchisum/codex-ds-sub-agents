@@ -1,24 +1,24 @@
 {
   "schema_version": 2,
   "selection": {
-    "primary": "deepseek-v4-flash",
+    "primary": "claude-opus-4-6",
     "fallbacks": [],
     "max_switches": 0
   },
   "providers": [
     {
-      "id": "deepseek_anthropic",
-      "name": "DeepSeek Anthropic Messages",
-      "base_url": "https://api.deepseek.com/anthropic",
+      "id": "aicodemirror_claude",
+      "name": "AI Code Mirror Claude",
+      "base_url": "https://api.aicodemirror.ai/api/claudecode",
       "protocol": "responses",
       "upstream_protocol": "anthropic_messages",
       "local_adapter": {
-        "listen_port": 18766,
+        "listen_port": 18767,
         "max_output_tokens": 16384
       },
       "auth": {
         "type": "keychain",
-        "service": "deepseek-api-key",
+        "service": "aicodemirror-api-key",
         "account": "codex"
       },
       "request_max_retries": 2,
@@ -28,14 +28,14 @@
   ],
   "models": [
     {
-      "id": "deepseek-v4-flash",
-      "provider": "deepseek_anthropic",
-      "remote_model": "deepseek-v4-flash",
-      "agent": "deepseek_anthropic_worker",
+      "id": "claude-opus-4-6",
+      "provider": "aicodemirror_claude",
+      "remote_model": "claude-opus-4-6",
+      "agent": "aicodemirror_claude_worker",
       "reasoning_effort": "high",
-      "display_name": "DeepSeek V4 Flash (Anthropic)",
-      "context_window": 1048576,
-      "max_context_window": 1048576,
+      "display_name": "Claude Opus 4.6",
+      "context_window": 200000,
+      "max_context_window": 200000,
       "effective_context_window_percent": 95,
       "supports_parallel_tool_calls": true,
       "supports_search_tool": false

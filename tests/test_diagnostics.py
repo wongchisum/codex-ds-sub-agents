@@ -166,6 +166,16 @@ class TailAndBoundsTests(unittest.TestCase):
 
 
 class ExclusionTests(unittest.TestCase):
+    def test_readme_regenerate_hint_uses_actual_interpreter(self) -> None:
+        """Issue #2: generated commands must use sys.executable, not bare python3."""
+        readme = diagnostics.build_readme(
+            run="regenerate-hint",
+            bundle_path=Path("/tmp/bundle"),
+            items=[],
+        )
+        self.assertIn(f"{sys.executable} scripts/diagnostics.py --run regenerate-hint", readme)
+        self.assertNotIn("\n  python3 scripts/diagnostics.py", readme)
+
     def test_task_markdown_and_config_are_excluded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

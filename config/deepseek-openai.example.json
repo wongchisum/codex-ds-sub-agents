@@ -1,21 +1,17 @@
 {
   "schema_version": 2,
   "selection": {
-    "primary": "deepseek-v4-flash",
+    "primary": "deepseek-v4-flash-openai",
     "fallbacks": [],
     "max_switches": 0
   },
   "providers": [
     {
-      "id": "deepseek_anthropic",
-      "name": "DeepSeek Anthropic Messages",
-      "base_url": "https://api.deepseek.com/anthropic",
+      "id": "deepseek_openai",
+      "name": "DeepSeek OpenAI Responses",
+      "base_url": "https://api.deepseek.com",
       "protocol": "responses",
-      "upstream_protocol": "anthropic_messages",
-      "local_adapter": {
-        "listen_port": 18766,
-        "max_output_tokens": 16384
-      },
+      "upstream_protocol": "openai_responses",
       "auth": {
         "type": "keychain",
         "service": "deepseek-api-key",
@@ -28,12 +24,12 @@
   ],
   "models": [
     {
-      "id": "deepseek-v4-flash",
-      "provider": "deepseek_anthropic",
+      "id": "deepseek-v4-flash-openai",
+      "provider": "deepseek_openai",
       "remote_model": "deepseek-v4-flash",
-      "agent": "deepseek_anthropic_worker",
+      "agent": "deepseek_openai_worker",
       "reasoning_effort": "high",
-      "display_name": "DeepSeek V4 Flash (Anthropic)",
+      "display_name": "DeepSeek V4 Flash (OpenAI Responses)",
       "context_window": 1048576,
       "max_context_window": 1048576,
       "effective_context_window_percent": 95,

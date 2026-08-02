@@ -39,6 +39,13 @@ class Profile:
 
 
 @dataclass(frozen=True)
+class ModelProtocolPreset:
+    name: str
+    manifest: Path
+    label: str
+
+
+@dataclass(frozen=True)
 class Protocol:
     name: str
     description: str
@@ -75,6 +82,29 @@ PROFILES: tuple[Profile, ...] = (
     ),
 )
 PROFILE_BY_NAME = {profile.name: profile for profile in PROFILES}
+MODEL_PROTOCOL_PRESETS: tuple[ModelProtocolPreset, ...] = (
+    ModelProtocolPreset(
+        "deepseek-anthropic",
+        PROJECT_ROOT / "config" / "deepseek-anthropic-1m.example.json",
+        "deepseek (anthropic)",
+    ),
+    ModelProtocolPreset(
+        "deepseek-openai",
+        PROJECT_ROOT / "config" / "deepseek-openai.example.json",
+        "deepseek (openai)",
+    ),
+    ModelProtocolPreset(
+        "gemini-anthropic",
+        PROJECT_ROOT / "config" / "gemini-anthropic.example.json",
+        "gemini (anthropic)",
+    ),
+    ModelProtocolPreset(
+        "claude-anthropic",
+        PROJECT_ROOT / "config" / "claude-anthropic.example.json",
+        "claude (anthropic)",
+    ),
+)
+PRESET_BY_NAME = {preset.name: preset for preset in MODEL_PROTOCOL_PRESETS}
 PROTOCOLS: tuple[Protocol, ...] = (
     Protocol(
         "openai_responses",
@@ -94,8 +124,21 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--profile", choices=tuple(PROFILE_BY_NAME))
     source.add_argument("--manifest", type=Path, help="install a custom manifest")
+    source.add_argument(
+        "--primary",
+        choices=tuple(PRESET_BY_NAME),
+        help="primary model-protocol preset",
+    )
     source.add_argument("--list-profiles", action="store_true")
     source.add_argument("--list-protocols", action="store_true")
+    source.add_argument("--list-model-protocols", action="store_true")
+    parser.add_argument(
+        "--fallback",
+        action="append",
+        default=[],
+        choices=tuple(PRESET_BY_NAME),
+        help="ordered fallback preset; repeat to declare more than one",
+    )
     parser.add_argument(
         "--name",
         help="stable local name for a custom manifest; defaults to its filename stem",
@@ -130,6 +173,13 @@ def print_profiles() -> None:
         print(f"{profile.name:20} {profile.description}")
 
 
+def print_model_protocols() -> None:
+    print("Model-protocol presets:")
+    for preset in MODEL_PROTOCOL_PRESETS:
+        print(f"{preset.name:20} {preset.label}")
+    print("Fallbacks are configured separately with repeated --fallback options.")
+
+
 def print_protocols() -> None:
     for protocol in PROTOCOLS:
         print(f"{protocol.name:20} {protocol.description}")
@@ -147,6 +197,94 @@ def choose_profile(input_fn: Callable[[str], str] = input) -> Profile:
     if not 1 <= index <= len(PROFILES):
         raise ValueError(f"profile selection must be between 1 and {len(PROFILES)}")
     return PROFILES[index - 1]
+
+
+def choose_model_protocols(
+    input_fn: Callable[[str], str] = input,
+) -> tuple[str, tuple[str, ...]]:
+    print("Available model-protocol presets:")
+    for index, preset in enumerate(MODEL_PROTOCOL_PRESETS, 1):
+        print(f"  {index}. {preset.label}")
+    primary_raw = input_fn("Select the primary model number: ").strip()
+    try:
+        primary_index = int(primary_raw)
+    except ValueError as error:
+        raise ValueError("primary selection must be a number") from error
+    if not 1 <= primary_index <= len(MODEL_PROTOCOL_PRESETS):
+        raise ValueError(
+            f"primary selection must be between 1 and {len(MODEL_PROTOCOL_PRESETS)}"
+        )
+    fallback_raw = input_fn(
+        "Optional fallback numbers in order (comma-separated, blank for none): "
+    ).strip()
+    fallback_names: list[str] = []
+    if fallback_raw:
+        try:
+            fallback_indexes = [int(value.strip()) for value in fallback_raw.split(",")]
+        except ValueError as error:
+            raise ValueError("fallback selections must be comma-separated numbers") from error
+        for index in fallback_indexes:
+            if not 1 <= index <= len(MODEL_PROTOCOL_PRESETS):
+                raise ValueError(
+                    f"fallback selection must be between 1 and {len(MODEL_PROTOCOL_PRESETS)}"
+                )
+            fallback_names.append(MODEL_PROTOCOL_PRESETS[index - 1].name)
+    primary = MODEL_PROTOCOL_PRESETS[primary_index - 1].name
+    validate_preset_chain(primary, fallback_names)
+    return primary, tuple(fallback_names)
+
+
+def validate_preset_chain(primary: str, fallbacks: Sequence[str]) -> None:
+    chain = [primary, *fallbacks]
+    duplicates = sorted({name for name in chain if chain.count(name) > 1})
+    if duplicates:
+        raise ValueError(
+            "primary and fallbacks must be unique; duplicate: " + ", ".join(duplicates)
+        )
+
+
+def build_preset_manifest(primary: str, fallbacks: Sequence[str]) -> bytes:
+    validate_preset_chain(primary, fallbacks)
+    providers: list[object] = []
+    models: list[object] = []
+    model_ids: list[str] = []
+    for name in (primary, *fallbacks):
+        raw = json.loads(PRESET_BY_NAME[name].manifest.read_text(encoding="utf-8"))
+        providers.extend(raw["providers"])
+        models.extend(raw["models"])
+        model_ids.append(raw["selection"]["primary"])
+    document = {
+        "schema_version": 2,
+        "selection": {
+            "primary": model_ids[0],
+            "fallbacks": model_ids[1:],
+            "max_switches": len(model_ids) - 1,
+        },
+        "providers": providers,
+        "models": models,
+    }
+    return (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def install_preset_manifest(
+    primary: str,
+    fallbacks: Sequence[str],
+    codex_home: Path,
+    name: str,
+) -> tuple[Path, ModelManifest]:
+    content = build_preset_manifest(primary, fallbacks)
+    destination = managed_manifest_path(codex_home, validate_local_name(name))
+    if destination.is_symlink() or (destination.exists() and not destination.is_file()):
+        raise ValueError(f"managed manifest target must be a regular file: {destination}")
+    if destination.is_file() and destination.read_bytes() != content:
+        raise ValueError(
+            f"managed manifest {destination} already has different content; "
+            "use a new --name or uninstall the existing profile first"
+        )
+    if not destination.exists():
+        atomic_write(destination, content, mode=0o600)
+        print(f"configured manifest: {destination}", flush=True)
+    return destination, load_manifest(destination)
 
 
 def validate_local_name(value: str) -> str:
@@ -358,15 +496,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.list_profiles:
         print_profiles()
         return 0
+    if args.list_model_protocols:
+        print_model_protocols()
+        return 0
+    if args.fallback and not args.primary:
+        print("error: --fallback requires --primary", file=sys.stderr)
+        return 2
 
     try:
+        primary = args.primary
+        fallbacks = tuple(args.fallback)
         if args.profile:
             profile = PROFILE_BY_NAME[args.profile]
-        elif args.manifest is None:
+        elif args.manifest is None and primary is None:
             if not sys.stdin.isatty():
-                print("error: use --profile or --manifest when stdin is not interactive", file=sys.stderr)
+                print(
+                    "error: use --primary, --profile, or --manifest when stdin is not interactive",
+                    file=sys.stderr,
+                )
                 return 2
-            profile = choose_profile()
+            primary, fallbacks = choose_model_protocols()
+            profile = None
         else:
             profile = None
 
@@ -376,7 +526,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         log_event(log_path, "configure_started", platform=platform.system())
         manifest_path: Optional[Path]
         manifest: Optional[ModelManifest]
-        if profile is not None and profile.manifest is None:
+        if primary is not None:
+            manifest_path, manifest = install_preset_manifest(
+                primary,
+                fallbacks,
+                codex_home,
+                args.name or primary,
+            )
+        elif profile is not None and profile.manifest is None:
             manifest_path = None
             manifest = None
         else:
@@ -436,7 +593,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     log_event(log_path, "configure_completed", exit_code=0)
     print("\nSetup completed. Start a new Codex task so Desktop loads the installed agent types.")
     print(f"Diagnostic log: {log_path}")
-    print("Then use $deepseek-delegation; the compatibility skill reads the active model selection.")
+    print("Then use $codex-custom-agents; the skill reads the active model selection.")
     return 0
 
 

@@ -44,6 +44,16 @@ def uninstall(codex_home: Path, *extra: str) -> subprocess.CompletedProcess[str]
 
 
 class UninstallTests(unittest.TestCase):
+    def test_reinstall_hint_uses_actual_interpreter_not_bare_python3(self) -> None:
+        """Issue #2: runtime-generated commands must use sys.executable on Windows."""
+        with tempfile.TemporaryDirectory() as directory:
+            codex_home = Path(directory) / "codex-home"
+            codex_home.mkdir(parents=True)
+            result = uninstall(codex_home)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn(f"reinstall with {sys.executable} scripts/install.py", result.stdout)
+            self.assertNotIn("reinstall with python3 ", result.stdout)
+
     def test_stop_adapter_service_failure_aborts_custom_uninstall(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             codex_home = Path(directory) / "codex-home"
@@ -259,7 +269,7 @@ class UninstallTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertTrue((codex_home / "agents" / "deepseek-worker.toml").is_file())
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "deepseek-delegation" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-agents" / "SKILL.md").is_file())
             self.assertFalse((codex_home / "agents" / "deepseek_anthropic_worker.toml").exists())
             self.assertFalse(
                 (codex_home / "models" / "deepseek_anthropic--deepseek-v4-flash.json").exists()
@@ -289,7 +299,7 @@ class UninstallTests(unittest.TestCase):
                 (codex_home / "models" / "deepseek_anthropic--deepseek-v4-flash.json").is_file()
             )
             self.assertTrue((codex_home / "models" / "subagent-selection.json").is_file())
-            self.assertTrue((codex_home / "skills" / "deepseek-delegation" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-agents" / "SKILL.md").is_file())
             self.assertTrue((codex_home / "adapters" / "anthropic_responses_adapter.py").is_file())
             config = (codex_home / "config.toml").read_text(encoding="utf-8")
             self.assertNotIn("[model_providers.deepseek]", config)
@@ -306,7 +316,7 @@ class UninstallTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertFalse((codex_home / "agents" / "deepseek-worker.toml").exists())
             self.assertFalse((codex_home / "models" / "deepseek-v4-flash.json").exists())
-            self.assertFalse((codex_home / "skills" / "deepseek-delegation").exists())
+            self.assertFalse((codex_home / "skills" / "codex-custom-agents").exists())
             config = codex_home / "config.toml"
             self.assertTrue(config.exists())
             self.assertNotIn("[model_providers.deepseek]", config.read_text(encoding="utf-8"))
@@ -349,14 +359,14 @@ class UninstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             codex_home = Path(directory) / "codex-home"
             self.assertEqual(0, install(codex_home).returncode)
-            extra = codex_home / "skills" / "deepseek-delegation" / "user-notes.md"
+            extra = codex_home / "skills" / "codex-custom-agents" / "user-notes.md"
             extra.write_text("user content\n", encoding="utf-8")
 
             result = uninstall(codex_home)
 
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertTrue(extra.is_file())
-            self.assertFalse((codex_home / "skills" / "deepseek-delegation" / "SKILL.md").exists())
+            self.assertFalse((codex_home / "skills" / "codex-custom-agents" / "SKILL.md").exists())
             self.assertIn("preserved", result.stdout)
 
     def test_uninstall_backs_up_config_before_removing_provider(self) -> None:
@@ -382,7 +392,7 @@ class UninstallTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertTrue((codex_home / "agents" / "deepseek-worker.toml").is_file())
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "deepseek-delegation" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-agents" / "SKILL.md").is_file())
             self.assertEqual(config_before, (codex_home / "config.toml").read_text(encoding="utf-8"))
             self.assertIn("would remove", result.stdout)
 

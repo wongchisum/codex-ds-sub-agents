@@ -685,7 +685,7 @@ def build_readme(run: str, bundle_path: Path, items: list[dict[str, Any]]) -> st
         f"    collection.",
         f"",
         f"Regenerate",
-        f"  python3 scripts/diagnostics.py --run {run} --out <output-dir> "
+        f"  {sys.executable} scripts/diagnostics.py --run {run} --out <output-dir> "
         f"[--format dir|zip]",
     ])
     return "\n".join(lines) + "\n"

@@ -46,7 +46,7 @@ python -m unittest tests.test_credential_store tests.test_configure tests.test_d
 每次安装或切换 agent 后新建 Codex 任务：
 
 1. 读取 `subagent-selection.json`，核对 primary、agent、provider 和 remote model。
-2. 用 `$deepseek-delegation` 创建一个只读任务，确认 atomic claim 回执含正确 agent/model/provider。
+2. 用 `$codex-custom-agents` 创建一个只读任务，确认 atomic claim 回执含正确 agent/model/provider。
 3. 再执行一个会修改临时测试文件并运行测试的工具循环，父任务验收真实产物。
 4. 让 worker 完成 claim，确认 receipt 为 `completed`、exit code 为 0。
 5. 重启 Codex Desktop 或重新登录 Windows，确认 Task Scheduler 能重新启动 adapter。

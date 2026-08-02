@@ -22,14 +22,14 @@ class WindowsImportSimulationTests(unittest.TestCase):
 
             root = Path(sys.argv[1])
             sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / "skills" / "deepseek-delegation" / "scripts"))
+            sys.path.insert(0, str(root / "skills" / "codex-custom-agents" / "scripts"))
 
             modules = (
                 "scripts/platform_runtime.py",
                 "scripts/adapter_service.py",
-                "skills/deepseek-delegation/scripts/platform_lock.py",
-                "skills/deepseek-delegation/scripts/claim_task.py",
-                "skills/deepseek-delegation/scripts/delegation_runtime.py",
+                "skills/codex-custom-agents/scripts/platform_lock.py",
+                "skills/codex-custom-agents/scripts/claim_task.py",
+                "skills/codex-custom-agents/scripts/delegation_runtime.py",
             )
             for relative in modules:
                 name = Path(relative).stem

@@ -4,7 +4,7 @@
 
 `codex-custom-subagents` lets Codex Desktop create subagents backed by custom providers, model names, URLs, and protocols. A manifest may declare multiple candidates, but one batch uses exactly one model. After an eligible transport failure, the parent can switch the whole batch to the next configured fallback.
 
-The repository is a Codex plugin containing the compatibility-named `deepseek-delegation` skill, an installer, model-catalog generation, an Anthropic Messages adapter, and macOS LaunchAgent / Windows Task Scheduler service management.
+The repository is a Codex plugin containing the `$codex-custom-agents` skill, an installer, model-catalog generation, an Anthropic Messages adapter, and macOS LaunchAgent / Windows Task Scheduler service management.
 
 ![Custom subagent tasks in Codex Desktop](assets/codex-custom-subagents.png)
 
@@ -17,8 +17,8 @@ Requirements: macOS, Codex Desktop signed in, Python 3.9+, `git`, and credential
 ```bash
 git clone https://github.com/wongchisum/codex-custom-subagents.git
 cd codex-custom-subagents
-python3 scripts/configure.py --list-protocols
-python3 scripts/configure.py --profile deepseek-anthropic
+python3 scripts/configure.py --list-model-protocols
+python3 scripts/configure.py --primary deepseek-anthropic
 ```
 
 `configure.py` copies the selected manifest to
@@ -40,10 +40,10 @@ Other compatibility profiles:
 
 ```bash
 # Claude primary with Gemini fallback
-python3 scripts/configure.py --profile claude-gemini
+python3 scripts/configure.py --primary claude-anthropic --fallback gemini-anthropic
 
 # Gemini only
-python3 scripts/configure.py --profile gemini-anthropic
+python3 scripts/configure.py --primary gemini-anthropic
 
 # Legacy fixed DeepSeek profile
 python3 scripts/configure.py --profile legacy-deepseek
@@ -63,7 +63,7 @@ Send Codex the installation prompt in the Chinese README's
 2. Confirm the primary model, ordered fallbacks, URLs, remote model names, protocol,
    Keychain service names, context declarations, and output limits.
 3. Never request or store API-key values. Custom manifests contain references only.
-4. Run one explicit `configure.py --profile ...` command, or generate an ignored
+4. Run one explicit `configure.py --primary ... [--fallback ...]` command, or generate an ignored
    `config/*.local.json` file and run `configure.py --manifest ... --name ...`.
 5. On exit 3, show the printed Keychain command and stop for local user input.
 6. Re-run the same configure command after confirmation. Report completion only
@@ -80,12 +80,12 @@ Ignore the durable mailbox in the target repository:
 Then prompt Codex:
 
 ```text
-Use $deepseek-delegation. Split review and test analysis into two independent
+Use $codex-custom-agents. Split review and test analysis into two independent
 tasks. Resolve the active agent from subagent-selection.json and create both
 workers with fork_turns: "none". Do not mix primary and fallback models in one batch.
 ```
 
-`deepseek-delegation` remains the skill ID for backward compatibility; the selected manifest agent may use Claude, Gemini, DeepSeek, or another supported model.
+`$deepseek-delegation` is recognized only as a migration source. New tasks use `$codex-custom-agents`; the selected manifest agent may use Claude, Gemini, DeepSeek, or another supported model.
 
 ## Documentation
 

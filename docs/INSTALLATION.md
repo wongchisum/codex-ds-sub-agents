@@ -8,7 +8,7 @@
 ~/.codex/
 ├── agents/                         # worker 定义
 ├── models/                         # model catalog 与 subagent-selection.json
-├── skills/deepseek-delegation/     # 兼容保留的 skill ID
+├── skills/codex-custom-agents/     # 当前 Skill：$codex-custom-agents
 ├── adapters/                       # Anthropic Messages adapter
 ├── logs/adapters/                  # 运行日志与不含正文的审计日志
 ├── logs/custom-subagents/          # configure 分阶段日志，输出已脱敏
@@ -44,13 +44,13 @@ python3 scripts/configure.py --list-protocols
 新配置应使用 schema v2 manifest。下列 profile 是兼容示例：
 
 ```bash
-python3 scripts/configure.py --profile deepseek-anthropic
-python3 scripts/configure.py --profile gemini-anthropic
-python3 scripts/configure.py --profile claude-gemini
+python3 scripts/configure.py --primary deepseek-anthropic
+python3 scripts/configure.py --primary gemini-anthropic
+python3 scripts/configure.py --primary claude-anthropic --fallback gemini-anthropic
 ```
 
 不传参数并在交互式终端运行时，脚本会显示数字菜单。Codex 或 CI 等非交互环境必须
-显式传入 `--profile` 或 `--manifest`，避免猜测用户要安装哪个模型。
+显式传入 `--primary`（可重复追加 `--fallback`）或 `--manifest`，避免猜测用户要安装哪个模型。`--profile` 只供旧脚本兼容。
 
 `configure.py` 完成以下工作：
 

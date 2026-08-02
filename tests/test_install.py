@@ -261,6 +261,27 @@ class InstallTests(unittest.TestCase):
             self.assertIn("--service-id claudecode_gemini", result.stdout)
             self.assertIn("--max-output-tokens 4096", result.stdout)
 
+    def test_manifest_install_lists_agents_and_requires_new_task(self) -> None:
+        """Issue #2: successful output must name installed agents and require a NEW task."""
+        with tempfile.TemporaryDirectory() as directory:
+            codex_home = Path(directory) / "codex-home"
+            manifest = PROJECT_ROOT / "config" / "model-providers.example.json"
+            result = run_manifest_install(codex_home, manifest)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("installed agents: aicodemirror_claude_worker, claudecode_gemini_worker", result.stdout)
+            self.assertIn("NEW Codex task", result.stdout)
+            self.assertIn("unknown agent_type", result.stdout)
+
+    def test_legacy_install_lists_agent_and_requires_new_task(self) -> None:
+        """Issue #2: legacy output must name the installed agent and require a NEW task."""
+        with tempfile.TemporaryDirectory() as directory:
+            codex_home = Path(directory) / "codex-home"
+            result = run_install(codex_home)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("installed agents: deepseek_worker", result.stdout)
+            self.assertIn("NEW Codex task", result.stdout)
+            self.assertIn("unknown agent_type", result.stdout)
+
     def test_custom_manifest_rejects_unsupported_runtime_protocol(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -369,7 +390,7 @@ class InstallTests(unittest.TestCase):
             ]
             self.assertEqual(1, len(real_headers))
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "deepseek-delegation" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-agents" / "SKILL.md").is_file())
 
     def test_codex_home_falls_back_when_env_is_blank(self) -> None:
         with patch.dict(os.environ, {"CODEX_HOME": "   "}):
@@ -432,7 +453,7 @@ class InstallTests(unittest.TestCase):
             codex_home = root / "codex-home"
             codex_home.mkdir()
             (codex_home / "skills").mkdir()
-            (codex_home / "skills" / "deepseek-delegation").symlink_to(outside, target_is_directory=True)
+            (codex_home / "skills" / "codex-custom-agents").symlink_to(outside, target_is_directory=True)
 
             result = run_install(codex_home)
 
@@ -488,7 +509,7 @@ class InstallTests(unittest.TestCase):
             codex_home = Path(directory) / "codex-home"
             first = run_install(codex_home)
             self.assertEqual(0, first.returncode, first.stderr)
-            skill_dest = codex_home / "skills" / "deepseek-delegation"
+            skill_dest = codex_home / "skills" / "codex-custom-agents"
             manifest_path = skill_dest / install.SKILL_MANIFEST
             manifest = install.json.loads(manifest_path.read_text(encoding="utf-8"))
             stale = skill_dest / "obsolete.txt"

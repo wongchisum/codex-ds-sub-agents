@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "deepseek-delegation" / "scripts" / "claim_task.py"
+CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-agents" / "scripts" / "claim_task.py"
 HEADER = "# DeepSeek task handoff v1"
 
 

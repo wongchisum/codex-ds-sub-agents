@@ -44,6 +44,51 @@ class ConfigureTests(unittest.TestCase):
                 self.assertTrue(profile.manifest.is_file())
                 load_manifest(profile.manifest)
 
+    def test_model_protocol_catalog_lists_four_canonical_choices(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, configure.main(["--list-model-protocols"]))
+        rendered = output.getvalue().lower()
+        for label in (
+            "deepseek (anthropic)",
+            "deepseek (openai)",
+            "gemini (anthropic)",
+            "claude (anthropic)",
+        ):
+            self.assertIn(label, rendered)
+        self.assertIn("fallbacks are configured separately", rendered)
+
+    def test_primary_preset_has_no_implicit_fallback(self) -> None:
+        document = json.loads(
+            configure.build_preset_manifest("deepseek-anthropic", ())
+        )
+        self.assertEqual("deepseek-v4-flash", document["selection"]["primary"])
+        self.assertEqual([], document["selection"]["fallbacks"])
+        self.assertEqual(0, document["selection"]["max_switches"])
+
+    def test_fallback_preserves_declared_order(self) -> None:
+        document = json.loads(
+            configure.build_preset_manifest(
+                "claude-anthropic",
+                ("gemini-anthropic", "deepseek-openai"),
+            )
+        )
+        self.assertEqual(
+            ["gemini-3-5-flash", "deepseek-v4-flash-openai"],
+            document["selection"]["fallbacks"],
+        )
+        self.assertEqual(2, document["selection"]["max_switches"])
+
+    def test_duplicate_primary_or_fallback_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            configure.build_preset_manifest(
+                "gemini-anthropic", ("deepseek-openai", "gemini-anthropic")
+            )
+
+    def test_legacy_profile_remains_accepted(self) -> None:
+        args = configure.parse_args(["--profile", "legacy-deepseek"])
+        self.assertEqual("legacy-deepseek", args.profile)
+
     def test_custom_manifest_is_copied_to_stable_private_location(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             codex_home = Path(directory) / "codex-home"

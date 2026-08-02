@@ -193,25 +193,25 @@ def windows_task_name(spec: ServiceSpec) -> str:
 
 
 def windows_query(spec: ServiceSpec) -> subprocess.CompletedProcess[str]:
-    return schtasks(("Query", "/TN", windows_task_name(spec), "/FO", "LIST"))
+    return schtasks(("/Query", "/TN", windows_task_name(spec), "/FO", "LIST"))
 
 
 def windows_create(spec: ServiceSpec) -> subprocess.CompletedProcess[str]:
     return schtasks(
-        ("Create", "/TN", windows_task_name(spec), "/XML", str(spec.definition_path), "/F")
+        ("/Create", "/TN", windows_task_name(spec), "/XML", str(spec.definition_path), "/F")
     )
 
 
 def windows_run(spec: ServiceSpec) -> subprocess.CompletedProcess[str]:
-    return schtasks(("Run", "/TN", windows_task_name(spec)))
+    return schtasks(("/Run", "/TN", windows_task_name(spec)))
 
 
 def windows_end(spec: ServiceSpec) -> subprocess.CompletedProcess[str]:
-    return schtasks(("End", "/TN", windows_task_name(spec)))
+    return schtasks(("/End", "/TN", windows_task_name(spec)))
 
 
 def windows_delete(spec: ServiceSpec) -> subprocess.CompletedProcess[str]:
-    return schtasks(("Delete", "/TN", windows_task_name(spec), "/F"))
+    return schtasks(("/Delete", "/TN", windows_task_name(spec), "/F"))
 
 
 def windows_task_xml_text(spec: ServiceSpec) -> str:

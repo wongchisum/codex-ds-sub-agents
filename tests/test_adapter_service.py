@@ -405,15 +405,15 @@ class WindowsAdapterServiceTests(unittest.TestCase):
             with patch("platform_runtime.is_windows", return_value=True):
                 spec = self._manifest_spec(root)
                 with patch.object(
-                    service, "schtasks", side_effect=lambda args: results[args[0].lower()]
+                    service, "schtasks", side_effect=lambda args: results[args[0].lstrip("/").lower()]
                 ) as schtasks, patch.object(service, "wait_for_health") as wait:
                     service.install_and_start(spec, None)
             wait.assert_called_once_with(spec)
             self.assertEqual(
                 [
-                    ("Query", "/TN", spec.label, "/FO", "LIST"),
-                    ("Create", "/TN", spec.label, "/XML", str(spec.plist_path), "/F"),
-                    ("Run", "/TN", spec.label),
+                    ("/Query", "/TN", spec.label, "/FO", "LIST"),
+                    ("/Create", "/TN", spec.label, "/XML", str(spec.plist_path), "/F"),
+                    ("/Run", "/TN", spec.label),
                 ],
                 [call.args[0] for call in schtasks.call_args_list],
             )
@@ -429,7 +429,7 @@ class WindowsAdapterServiceTests(unittest.TestCase):
                     with self.assertRaisesRegex(service.ServiceError, "without a verifiable managed definition"):
                         service.install_and_start(spec, None)
             self.assertEqual(
-                ("Query", "/TN", spec.label, "/FO", "LIST"),
+                ("/Query", "/TN", spec.label, "/FO", "LIST"),
                 schtasks.call_args.args[0],
             )
 
@@ -446,15 +446,15 @@ class WindowsAdapterServiceTests(unittest.TestCase):
                 spec.plist_path.parent.mkdir(parents=True)
                 spec.plist_path.write_bytes(service.windows_task_xml(spec))
                 with patch.object(
-                    service, "schtasks", side_effect=lambda args: results[args[0].lower()]
+                    service, "schtasks", side_effect=lambda args: results[args[0].lstrip("/").lower()]
                 ) as schtasks:
                     service.stop_and_remove(spec, None)
             self.assertFalse(spec.plist_path.exists())
             self.assertEqual(
                 [
-                    ("Query", "/TN", spec.label, "/FO", "LIST"),
-                    ("End", "/TN", spec.label),
-                    ("Delete", "/TN", spec.label, "/F"),
+                    ("/Query", "/TN", spec.label, "/FO", "LIST"),
+                    ("/End", "/TN", spec.label),
+                    ("/Delete", "/TN", spec.label, "/F"),
                 ],
                 [call.args[0] for call in schtasks.call_args_list],
             )
@@ -466,3 +466,27 @@ class WindowsAdapterServiceTests(unittest.TestCase):
                 spec = self._manifest_spec(root)
                 service.atomic_write(spec.plist_path, service.render_definition(spec))
                 self.assertTrue(spec.plist_path.read_bytes().startswith(b"\xff\xfe"))
+
+    def test_windows_schtasks_actions_use_slash_prefixed_verbs(self) -> None:
+        """Issue #2: schtasks actions must be /Query, /Create, /Run, /End, /Delete."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("platform_runtime.is_windows", return_value=True):
+                spec = self._manifest_spec(root)
+            results = {
+                "query": subprocess.CompletedProcess([], 0, "running", ""),
+                "create": subprocess.CompletedProcess([], 0, "", ""),
+                "run": subprocess.CompletedProcess([], 0, "", ""),
+                "end": subprocess.CompletedProcess([], 0, "", ""),
+                "delete": subprocess.CompletedProcess([], 0, "", ""),
+            }
+            with patch.object(
+                service, "schtasks", side_effect=lambda args: results[args[0].lstrip("/").lower()]
+            ) as schtasks:
+                service.windows_query(spec)
+                service.windows_create(spec)
+                service.windows_run(spec)
+                service.windows_end(spec)
+                service.windows_delete(spec)
+            verbs = [call.args[0][0] for call in schtasks.call_args_list]
+        self.assertEqual(["/Query", "/Create", "/Run", "/End", "/Delete"], verbs)

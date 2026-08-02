@@ -29,7 +29,7 @@
     ],
     "websiteURL": "https://github.com/wongchisum/codex-custom-subagents",
     "defaultPrompt": [
-      "Use $deepseek-delegation to split this task across the configured custom subagent model."
+      "Use $codex-custom-agents to split this task across the configured custom subagent model."
     ]
   }
 }
