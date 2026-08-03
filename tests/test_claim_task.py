@@ -9,13 +9,20 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from tests.test_support import create_symlink_or_skip
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "deepseek-delegation" / "scripts" / "claim_task.py"
-HEADER = "# DeepSeek task handoff v1"
+CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py"
+HEADER = "# Codex Custom Subagents task handoff v1"
+LEGACY_HEADER = "# DeepSeek task handoff v1"
 
 
 def mailbox(workspace: Path) -> Path:
+    return workspace / ".codex-custom-subagents"
+
+
+def legacy_mailbox(workspace: Path) -> Path:
     return workspace / ".deepseek-delegations"
 
 
@@ -29,9 +36,22 @@ def write_task(workspace: Path, task_id: str, declared_id: str | None = None) ->
     )
 
 
-def run(workspace: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run(
+    workspace: Path,
+    *args: str,
+    cwd: Path | None = None,
+    allow_workspace_mismatch: bool = False,
+    use_legacy_mailbox: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(CLAIM_SCRIPT), "--workspace", str(workspace)]
+    if allow_workspace_mismatch:
+        command.append("--allow-workspace-mismatch")
+    if use_legacy_mailbox:
+        command.append("--legacy-mailbox")
+    command.extend(args)
     return subprocess.run(
-        [sys.executable, str(CLAIM_SCRIPT), "--workspace", str(workspace), *args],
+        command,
+        cwd=cwd or workspace,
         text=True,
         capture_output=True,
         check=False,
@@ -47,6 +67,41 @@ def claimed_files(workspace: Path) -> list[Path]:
 
 
 class ClaimTaskTests(unittest.TestCase):
+    def test_legacy_header_is_rejected_from_the_new_mailbox(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            pending = mailbox(workspace) / "pending"
+            pending.mkdir(parents=True)
+            (pending / "task_alpha.md").write_text(
+                f"{LEGACY_HEADER}\n\nTask: task_alpha\n\nReturn task_alpha.\n",
+                encoding="utf-8",
+            )
+
+            result = claim(workspace)
+
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertEqual("empty", json.loads(result.stdout)["status"])
+            self.assertEqual(1, len(list((mailbox(workspace) / "rejected").glob("*.md"))))
+
+    def test_legacy_mailbox_requires_explicit_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            pending = legacy_mailbox(workspace) / "pending"
+            pending.mkdir(parents=True)
+            (pending / "task_alpha.md").write_text(
+                f"{LEGACY_HEADER}\n\nTask: task_alpha\n\nReturn task_alpha.\n",
+                encoding="utf-8",
+            )
+
+            current = claim(workspace)
+            legacy = run(workspace, use_legacy_mailbox=True)
+
+            self.assertEqual(2, current.returncode)
+            self.assertFalse(mailbox(workspace).exists())
+            self.assertEqual(0, legacy.returncode, legacy.stderr)
+            legacy_path = Path(json.loads(legacy.stdout)["path"])
+            self.assertEqual(".deepseek-delegations", legacy_path.parent.parent.name)
+
     def test_parallel_workers_claim_unique_tasks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -87,12 +142,16 @@ class ClaimTaskTests(unittest.TestCase):
             self.assertEqual(2, result.returncode)
             self.assertFalse((mailbox(workspace)).exists())
 
-            workspace.joinpath(".deepseek-delegations", "pending").mkdir(parents=True)
+            workspace.joinpath(".codex-custom-subagents", "pending").mkdir(parents=True)
             result = claim(workspace)
             self.assertEqual(2, result.returncode)
             self.assertEqual(
-                {".deepseek-delegations", ".deepseek-delegations/pending"},
-                {str(path.relative_to(workspace)) for path in workspace.rglob("*") if path.is_dir()},
+                {".codex-custom-subagents", ".codex-custom-subagents/pending"},
+                {
+                    path.relative_to(workspace).as_posix()
+                    for path in workspace.rglob("*")
+                    if path.is_dir()
+                },
             )
 
     def test_body_task_lines_do_not_falsely_reject(self) -> None:
@@ -118,7 +177,7 @@ class ClaimTaskTests(unittest.TestCase):
             pending.mkdir(parents=True)
             write_task(workspace, "task_alpha")
             (pending / "dir.md").mkdir()
-            (pending / "link.md").symlink_to(pending / "task_alpha.md")
+            create_symlink_or_skip(self, pending / "link.md", pending / "task_alpha.md")
             (pending / "Bad_Task.md").write_text(f"{HEADER}\n\nTask: Bad_Task\n", encoding="utf-8")
 
             result = claim(workspace)
@@ -143,6 +202,41 @@ class ClaimTaskTests(unittest.TestCase):
             receipt = Path(payload["receipt"])
             self.assertTrue(receipt.is_file())
             self.assertEqual(payload, json.loads(receipt.read_text(encoding="utf-8")))
+            self.assertEqual(1, payload["schema_version"])
+            self.assertRegex(payload["attempt_id"], r"^[0-9a-f]{32}$")
+            self.assertTrue(payload["claimed_at"].endswith("Z"))
+            self.assertIsNone(payload["completed_at"])
+            self.assertIsNone(payload["exit_code"])
+            self.assertIsNone(payload["summary"])
+            for field in ("parent_thread_id", "worker_thread_id", "agent", "model", "provider"):
+                self.assertIsNone(payload[field])
+
+    def test_claim_records_only_explicit_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+
+            result = run(
+                workspace,
+                "--parent-thread-id",
+                "thread-parent",
+                "--worker-thread-id",
+                "thread-worker",
+                "--agent",
+                "model_worker",
+                "--model",
+                "deepseek-v4",
+                "--provider",
+                "example-provider",
+            )
+            payload = json.loads(result.stdout)
+
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("thread-parent", payload["parent_thread_id"])
+            self.assertEqual("thread-worker", payload["worker_thread_id"])
+            self.assertEqual("model_worker", payload["agent"])
+            self.assertEqual("deepseek-v4", payload["model"])
+            self.assertEqual("example-provider", payload["provider"])
 
     def test_claim_error_on_blocked_directories_returns_json(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -169,6 +263,141 @@ class ClaimTaskTests(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
 
 
+class WorkspaceBoundaryTests(unittest.TestCase):
+    def test_workspace_mismatch_is_rejected_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+
+            result = run(workspace, cwd=PROJECT_ROOT)
+            payload = json.loads(result.stdout)
+
+            self.assertEqual(1, result.returncode)
+            self.assertEqual("error", payload["status"])
+            self.assertIn("workspace differs", payload["reason"])
+            self.assertEqual(1, len(list((mailbox(workspace) / "pending").glob("*.md"))))
+            self.assertFalse((mailbox(workspace) / "claimed").exists())
+
+    def test_workspace_mismatch_requires_explicit_override(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+
+            result = run(
+                workspace,
+                cwd=PROJECT_ROOT,
+                allow_workspace_mismatch=True,
+            )
+
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("claimed", json.loads(result.stdout)["status"])
+            self.assertIn("explicitly allowed", result.stderr)
+
+
+class FinalizeTests(unittest.TestCase):
+    def test_complete_atomically_updates_and_retains_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+            claimed = json.loads(claim(workspace).stdout)
+
+            result = run(
+                workspace,
+                "complete",
+                "--task-id",
+                "task_alpha",
+                "--claim-id",
+                claimed["claim_id"],
+                "--summary",
+                "tests passed",
+            )
+            payload = json.loads(result.stdout)
+            receipt = Path(claimed["receipt"])
+
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("completed", payload["status"])
+            self.assertEqual(0, payload["exit_code"])
+            self.assertEqual("tests passed", payload["summary"])
+            self.assertTrue(payload["completed_at"].endswith("Z"))
+            self.assertEqual(claimed["attempt_id"], payload["attempt_id"])
+            self.assertTrue(Path(claimed["path"]).is_file())
+            self.assertTrue(receipt.is_file())
+            self.assertEqual(payload, json.loads(receipt.read_text(encoding="utf-8")))
+
+            repeated = json.loads(run(
+                workspace,
+                "complete",
+                "--task-id",
+                "task_alpha",
+                "--claim-id",
+                claimed["claim_id"],
+            ).stdout)
+            self.assertEqual(payload, repeated)
+
+    def test_fail_records_original_exit_code_without_deleting_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+            claimed = json.loads(claim(workspace).stdout)
+
+            result = run(
+                workspace,
+                "fail",
+                "--task-id",
+                "task_alpha",
+                "--claim-id",
+                claimed["claim_id"],
+                "--exit-code",
+                "17",
+                "--summary",
+                "unit test failed",
+            )
+            payload = json.loads(result.stdout)
+
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("failed", payload["status"])
+            self.assertEqual(17, payload["exit_code"])
+            self.assertEqual("unit test failed", payload["summary"])
+            self.assertTrue(Path(claimed["receipt"]).is_file())
+
+    def test_complete_and_fail_cannot_overwrite_each_other(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+            claimed = json.loads(claim(workspace).stdout)
+            common = ("--task-id", "task_alpha", "--claim-id", claimed["claim_id"])
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                results = list(executor.map(
+                    lambda command: run(workspace, command, *common),
+                    ("complete", "fail"),
+                ))
+
+            self.assertEqual([0, 1], sorted(result.returncode for result in results))
+            receipt = json.loads(Path(claimed["receipt"]).read_text(encoding="utf-8"))
+            self.assertIn(receipt["status"], {"completed", "failed"})
+            self.assertEqual(claimed["attempt_id"], receipt["attempt_id"])
+
+    def test_finalize_requires_exact_task_and_claim_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+            claimed = json.loads(claim(workspace).stdout)
+
+            result = run(
+                workspace,
+                "complete",
+                "--task-id",
+                "task_alpha",
+                "--claim-id",
+                "different-claim",
+            )
+
+            self.assertEqual(1, result.returncode)
+            self.assertEqual("not_found", json.loads(result.stdout)["status"])
+            self.assertEqual("claimed", json.loads(Path(claimed["receipt"]).read_text(encoding="utf-8"))["status"])
+
+
 class RecoverTests(unittest.TestCase):
     def test_receipted_claims_need_explicit_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -191,7 +420,39 @@ class RecoverTests(unittest.TestCase):
             self.assertEqual(1, len(payload["requeued"]))
             self.assertEqual([], claimed_files(workspace))
             self.assertEqual(1, len(list((mailbox(workspace) / "recovered").glob("*.md"))))
-            self.assertFalse(receipt.exists())
+            self.assertTrue(receipt.exists())
+            self.assertEqual("recovered", json.loads(receipt.read_text(encoding="utf-8"))["status"])
+
+    def test_recover_to_pending_retains_attempt_audit_and_next_claim_is_new_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            write_task(workspace, "task_alpha")
+            first = json.loads(claim(workspace).stdout)
+
+            recovered = run(
+                workspace,
+                "recover",
+                "--task-id",
+                "task_alpha",
+                "--claim-id",
+                first["claim_id"],
+                "--to",
+                "pending",
+            )
+            first_receipt = Path(first["receipt"])
+
+            self.assertEqual(0, recovered.returncode)
+            self.assertTrue(first_receipt.is_file())
+            first_audit = json.loads(first_receipt.read_text(encoding="utf-8"))
+            self.assertEqual("recovered", first_audit["status"])
+            self.assertEqual("pending", first_audit["recovery_target"])
+            self.assertTrue((mailbox(workspace) / "pending" / "task_alpha.md").is_file())
+
+            second = json.loads(claim(workspace).stdout)
+            self.assertNotEqual(first["claim_id"], second["claim_id"])
+            self.assertNotEqual(first["attempt_id"], second["attempt_id"])
+            self.assertTrue(first_receipt.is_file())
+            self.assertTrue(Path(second["receipt"]).is_file())
 
     def test_missing_receipt_claims_need_explicit_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -208,18 +469,20 @@ class RecoverTests(unittest.TestCase):
             self.assertEqual(1, len(payload["requeued"]))
             self.assertTrue((mailbox(workspace) / "recovered" / "task_gamma--c2.md").is_file())
 
-    def test_orphan_receipts_are_cleaned(self) -> None:
+    def test_orphan_receipts_are_audited_and_retained(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
-            claimed_dir = mailbox(workspace) / "claimed"
-            claimed_dir.mkdir(parents=True)
-            orphan = claimed_dir / "task_delta--c3.md.receipt"
-            orphan.write_text('{"status": "claimed"}', encoding="utf-8")
+            write_task(workspace, "task_delta")
+            claimed = json.loads(claim(workspace).stdout)
+            claimed_path = Path(claimed["path"])
+            orphan = Path(claimed["receipt"])
+            claimed_path.replace(mailbox(workspace) / "pending" / "task_delta.md")
 
             payload = json.loads(run(workspace, "recover").stdout)
 
-            self.assertEqual("orphan_receipt", payload["cleaned"][0]["reason"])
-            self.assertFalse(orphan.exists())
+            self.assertEqual("retained_orphan_receipt", payload["audited"][0]["reason"])
+            self.assertTrue(orphan.exists())
+            self.assertEqual("orphaned", json.loads(orphan.read_text(encoding="utf-8"))["status"])
 
     def test_invalid_claimed_file_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

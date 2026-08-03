@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "selection": {
+    "primary": "claude-opus-4-6",
+    "fallbacks": [],
+    "max_switches": 0
+  },
+  "providers": [
+    {
+      "id": "aicodemirror_claude",
+      "name": "AI Code Mirror Claude",
+      "base_url": "https://api.aicodemirror.ai/api/claudecode",
+      "protocol": "responses",
+      "upstream_protocol": "anthropic_messages",
+      "local_adapter": {
+        "listen_port": 18767,
+        "max_output_tokens": 16384
+      },
+      "auth": {
+        "type": "keychain",
+        "service": "aicodemirror-api-key",
+        "account": "codex"
+      },
+      "request_max_retries": 2,
+      "stream_max_retries": 2,
+      "stream_idle_timeout_ms": 300000
+    }
+  ],
+  "models": [
+    {
+      "id": "claude-opus-4-6",
+      "provider": "aicodemirror_claude",
+      "remote_model": "claude-opus-4-6",
+      "agent": "aicodemirror_claude_worker",
+      "reasoning_effort": "high",
+      "display_name": "Claude Opus 4.6",
+      "context_window": 200000,
+      "max_context_window": 200000,
+      "effective_context_window_percent": 95,
+      "supports_parallel_tool_calls": true,
+      "supports_search_tool": false
+    }
+  ]
+}

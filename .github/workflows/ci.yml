@@ -6,15 +6,22 @@ on:
 
 jobs:
   test:
-    runs-on: macos-latest
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Unit tests
-        run: python3 -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -v
       - name: Compile Python sources
-        run: python3 -m py_compile scripts/*.py skills/deepseek-delegation/scripts/*.py
+        run: python -m compileall -q scripts skills/codex-custom-subagents/scripts
       - name: Validate release assets (model JSON, provider TOML, rendered agent TOML, skill format)
-        run: python3 tests/test_release_assets.py
+        run: python tests/test_release_assets.py
