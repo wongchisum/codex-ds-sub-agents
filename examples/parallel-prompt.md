@@ -3,7 +3,7 @@ English · [简体中文](parallel-prompt.zh-CN.md)
 # Custom subagent parallel prompt
 
 ```text
-Use $codex-custom-subagents to put the independent tasks below into one task
+Use $codex-custom-subagent to put the independent tasks below into one task
 pool. First run delegation_runtime.py begin and resolve active.agent from
 subagent-selection.json; fall back to deepseek_worker only when the selection
 file does not exist. Use one agent for the entire worker batch and set

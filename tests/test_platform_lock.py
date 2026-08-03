@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "skills" / "codex-custom-subagents" / "scripts"))
+sys.path.insert(0, str(ROOT / "skills" / "codex-custom-subagent" / "scripts"))
 
 import platform_lock  # noqa: E402
 
@@ -40,7 +40,9 @@ class PlatformLockBackendTests(unittest.TestCase):
     def test_platform_lock_creates_lock_file_and_releases_on_exit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             lock_path = Path(directory) / ".lock"
-            with patch.object(platform_lock, "lock_backend", return_value="posix"):
+            with patch.object(platform_lock, "lock_backend", return_value="posix"), patch.object(
+                platform_lock, "_posix_lock"
+            ):
                 with platform_lock.platform_file_lock(lock_path):
                     self.assertTrue(lock_path.is_file())
             self.assertTrue(lock_path.is_file())

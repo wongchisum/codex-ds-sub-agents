@@ -4,7 +4,7 @@
 
 [文档](docs/zh-CN/README.md) · [安装](docs/zh-CN/INSTALLATION.md) · [配置](docs/zh-CN/CONFIGURATION.md) · [故障排查](docs/zh-CN/TROUBLESHOOTING.md)
 
-`codex-custom-subagents` 帮助 Codex Desktop 使用自定义模型 Provider 作为 subagent 完成任务。它支持 macOS 和 Windows，不把凭证写入 Prompt 或 manifest，并通过 `$codex-custom-subagents` Skill 让 Codex 委派工作。
+`codex-custom-subagents` 帮助 Codex Desktop 使用自定义模型 Provider 作为 subagent 完成任务。它支持 macOS 和 Windows，不把凭证写入 Prompt 或 manifest，并通过 `$codex-custom-subagent` Skill 让 Codex 委派工作。
 
 ![Codex Desktop 中的自定义 subagent 任务](assets/codex-custom-subagents.png)
 
@@ -29,7 +29,7 @@ https://github.com/wongchisum/codex-custom-subagents
    交互式凭证命令，然后等待我在本机执行。
 7. 凭证保存后重复相同的 configure 命令，再运行 doctor。doctor 未通过时不得宣称完成。
 8. 提醒我关闭当前 Codex 任务并新建任务，因为已打开的任务不会热加载新 agent 类型。
-9. 在新任务中使用 $codex-custom-subagents，不再使用两个旧 Skill 名。
+9. 在新任务中使用 $codex-custom-subagent，不再使用旧 Skill 名。
 10. 不显示、复制、提交或上传任何凭证值。
 ```
 
@@ -40,7 +40,7 @@ https://github.com/wongchisum/codex-custom-subagents
 安装后新建一个 **Codex 任务**，发送类似 Prompt：
 
 ```text
-使用 $codex-custom-subagents，把下面的工作委派给已经配置的自定义 subagent：
+使用 $codex-custom-subagent，把下面的工作委派给已经配置的自定义 subagent：
 
 <描述任务>
 
@@ -51,7 +51,7 @@ https://github.com/wongchisum/codex-custom-subagents
 需要并行处理多个独立任务时：
 
 ```text
-使用 $codex-custom-subagents，把这项工作拆成相互独立的 subagent 任务。
+使用 $codex-custom-subagent，把这项工作拆成相互独立的 subagent 任务。
 整批只使用一个 active model，为每个 worker 指定有限职责，并在接受结果前逐项验证。
 ```
 
@@ -69,7 +69,7 @@ https://github.com/wongchisum/codex-custom-subagents
 - 支持 macOS Keychain、Windows Credential Manager 和环境变量凭证引用。
 - 支持 macOS LaunchAgent 和 Windows Task Scheduler 服务管理。
 - 原子任务领取、持久回执、恢复、脱敏诊断和带所有权保护的安全卸载。
-- 把 `$deepseek-delegation` 和 `$codex-custom-agents` 安全迁移到 `$codex-custom-subagents`。
+- 把 `$deepseek-delegation`、`$codex-custom-agents` 和 `$codex-custom-subagents` 安全迁移到 `$codex-custom-subagent`。
 
 ## 手动快速安装
 

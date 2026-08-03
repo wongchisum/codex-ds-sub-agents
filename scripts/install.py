@@ -32,8 +32,12 @@ from platform_runtime import python_command, python_command_toml, toml_path_esca
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROVIDER_HEADER = "[model_providers.deepseek]"
 LEGACY_WORKER_AGENT = "deepseek_worker"
-SKILL_NAME = "codex-custom-subagents"
-LEGACY_SKILL_NAMES = ("deepseek-delegation", "codex-custom-agents")
+SKILL_NAME = "codex-custom-subagent"
+LEGACY_SKILL_NAMES = (
+    "deepseek-delegation",
+    "codex-custom-agents",
+    "codex-custom-subagents",
+)
 SKILL_MANIFEST = ".codex-deepseek-manifest.json"
 SKILL_IGNORED_DIRECTORIES = frozenset({"__pycache__"})
 SKILL_IGNORED_FILES = frozenset({".DS_Store"})

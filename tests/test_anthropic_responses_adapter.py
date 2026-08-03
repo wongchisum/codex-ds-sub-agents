@@ -77,6 +77,23 @@ class AnthropicResponsesAdapterTests(unittest.TestCase):
         self.assertEqual(400, status)
         self.assertEqual("invalid_request_error", body["error"]["type"])
 
+    def test_missing_bearer_is_actionable_and_does_not_call_upstream(self) -> None:
+        handler = object.__new__(adapter.AnthropicAdapterHandler)
+        handler.path = "/responses"
+        handler.headers = {}
+        handler.server = SimpleNamespace(max_output_tokens=4096, audit_log=None)
+        handler._json = mock.Mock()
+        handler._call_upstream = mock.Mock()
+
+        handler.do_POST()
+
+        handler._json.assert_called_once()
+        status, body, _request_id = handler._json.call_args.args
+        self.assertEqual(401, status)
+        self.assertEqual("authentication_error", body["error"]["type"])
+        self.assertIn("provider auth command", body["error"]["message"])
+        handler._call_upstream.assert_not_called()
+
     def test_invalid_upstream_structure_returns_502(self) -> None:
         status, body, _ = self._request(
             {"content": "not-an-array"},

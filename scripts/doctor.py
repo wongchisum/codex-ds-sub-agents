@@ -207,7 +207,7 @@ def _minimal_install(project_root: Path, home: Path) -> None:
     )
     (home / "models").mkdir(parents=True, exist_ok=True)
     shutil.copy2(project_root / "models" / "deepseek-v4-flash.json", home / "models" / "deepseek-v4-flash.json")
-    shutil.copytree(project_root / "skills" / "codex-custom-subagents", home / "skills" / "codex-custom-subagents")
+    shutil.copytree(project_root / "skills" / "codex-custom-subagent", home / "skills" / "codex-custom-subagent")
 
 
 def _run_codex(codex: str, codex_home: Path, timeout: float) -> tuple[int, str]:
@@ -258,8 +258,8 @@ def main() -> int:
 
     agent = codex_home / "agents" / "deepseek-worker.toml"
     model = codex_home / "models" / "deepseek-v4-flash.json"
-    skill = codex_home / "skills" / "codex-custom-subagents" / "SKILL.md"
-    claim = codex_home / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py"
+    skill = codex_home / "skills" / "codex-custom-subagent" / "SKILL.md"
+    claim = codex_home / "skills" / "codex-custom-subagent" / "scripts" / "claim_task.py"
     config = codex_home / "config.toml"
 
     for label, path in (("agent", agent), ("model", model), ("skill", skill), ("claim script", claim), ("config", config)):

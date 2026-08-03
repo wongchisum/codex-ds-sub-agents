@@ -3,7 +3,7 @@
 # 自定义 subagent 并行 Prompt
 
 ```text
-使用 $codex-custom-subagents，把以下独立任务放入同一个任务池。先运行 delegation_runtime.py begin，从 subagent-selection.json 解析 active.agent；如果 selection 不存在，才回退到 deepseek_worker。整批 worker 使用同一个 agent，全部设置 fork_turns: "none"。主智能体只负责拆分、等待和最终验收，不得代做子任务。
+使用 $codex-custom-subagent，把以下独立任务放入同一个任务池。先运行 delegation_runtime.py begin，从 subagent-selection.json 解析 active.agent；如果 selection 不存在，才回退到 deepseek_worker。整批 worker 使用同一个 agent，全部设置 fork_turns: "none"。主智能体只负责拆分、等待和最终验收，不得代做子任务。
 
 任务一，ID 为 analyze_auth：
 分析 src/auth 的调用关系和错误边界，不修改代码，报告文件与行号证据。

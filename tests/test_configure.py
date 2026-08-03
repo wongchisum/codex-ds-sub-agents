@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,8 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
+
+from tests.test_support import create_symlink_or_skip
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -101,7 +104,8 @@ class ConfigureTests(unittest.TestCase):
                 destination,
             )
             self.assertEqual(source.read_bytes(), destination.read_bytes())
-            self.assertEqual(0o600, destination.stat().st_mode & 0o777)
+            if os.name != "nt":
+                self.assertEqual(0o600, destination.stat().st_mode & 0o777)
             self.assertEqual("gemini-3-5-flash", manifest.selection.primary.id)
 
     def test_changed_managed_manifest_requires_new_name_or_uninstall(self) -> None:
@@ -125,7 +129,7 @@ class ConfigureTests(unittest.TestCase):
             destination.parent.mkdir(parents=True)
             outside = root / "outside.json"
             outside.write_text("outside", encoding="utf-8")
-            destination.symlink_to(outside)
+            create_symlink_or_skip(self, destination, outside)
             source = PROJECT_ROOT / "config" / "gemini-anthropic.example.json"
             with self.assertRaisesRegex(ValueError, "regular file"):
                 configure.install_managed_manifest(source, codex_home, "team")
@@ -290,7 +294,7 @@ class ConfigureTests(unittest.TestCase):
             self.assertIn("doctor.py", calls[1][1])
             self.assertIn("start a NEW Codex task", output.getvalue())
             self.assertIn("unknown agent_type", output.getvalue())
-            self.assertIn("$codex-custom-subagents", output.getvalue())
+            self.assertIn("$codex-custom-subagent", output.getvalue())
 
     def test_skip_doctor_still_requires_a_new_task(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

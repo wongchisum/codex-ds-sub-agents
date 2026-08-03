@@ -9,12 +9,12 @@ English · [简体中文](zh-CN/README.md)
 1. Copy the [installation prompt](PROMPT_INSTALLATION.md) into Codex Desktop.
 2. Let Codex inspect the platform, collect non-secret provider settings, run the installer, and verify the result.
 3. Start a new Codex task after installation.
-4. Use `$codex-custom-subagents` to delegate work.
+4. Use `$codex-custom-subagent` to delegate work.
 
 Example usage:
 
 ```text
-Use $codex-custom-subagents to delegate this task to the configured custom
+Use $codex-custom-subagent to delegate this task to the configured custom
 subagent. Read subagent-selection.json, use its active.agent, and verify the
 worker's artifacts and tests before accepting the result.
 ```

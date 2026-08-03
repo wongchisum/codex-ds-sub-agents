@@ -9,9 +9,11 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from tests.test_support import create_symlink_or_skip
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py"
+CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-subagent" / "scripts" / "claim_task.py"
 HEADER = "# DeepSeek task handoff v1"
 
 
@@ -102,7 +104,11 @@ class ClaimTaskTests(unittest.TestCase):
             self.assertEqual(2, result.returncode)
             self.assertEqual(
                 {".deepseek-delegations", ".deepseek-delegations/pending"},
-                {str(path.relative_to(workspace)) for path in workspace.rglob("*") if path.is_dir()},
+                {
+                    path.relative_to(workspace).as_posix()
+                    for path in workspace.rglob("*")
+                    if path.is_dir()
+                },
             )
 
     def test_body_task_lines_do_not_falsely_reject(self) -> None:
@@ -128,7 +134,7 @@ class ClaimTaskTests(unittest.TestCase):
             pending.mkdir(parents=True)
             write_task(workspace, "task_alpha")
             (pending / "dir.md").mkdir()
-            (pending / "link.md").symlink_to(pending / "task_alpha.md")
+            create_symlink_or_skip(self, pending / "link.md", pending / "task_alpha.md")
             (pending / "Bad_Task.md").write_text(f"{HEADER}\n\nTask: Bad_Task\n", encoding="utf-8")
 
             result = claim(workspace)

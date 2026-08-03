@@ -95,6 +95,22 @@ class ModelManifest:
     models: Mapping[str, ModelSpec]
     selection: SelectionPolicy
 
+    def _auth_metadata(self, model: ModelSpec) -> dict[str, str]:
+        """Return only the credential reference needed for runtime preflight.
+
+        The value is deliberately limited to the credential kind, name, account,
+        and (for env headers) header name. Credential values must remain in the
+        native secure store or process environment and must never enter the
+        selection file.
+        """
+        auth = self.providers[model.provider_id].auth
+        metadata = {"type": auth.kind, "name": auth.name}
+        if auth.kind == "keychain":
+            metadata["account"] = auth.account
+        elif auth.kind == "env_header" and auth.header is not None:
+            metadata["header"] = auth.header
+        return metadata
+
     def normalized_selection(self) -> dict:
         return {
             "schema_version": 1,
@@ -108,6 +124,7 @@ class ModelManifest:
                     "agent": self.models[model.id].agent,
                     "provider": model.provider_id,
                     "remote_model": model.remote_name,
+                    "auth": self._auth_metadata(self.models[model.id]),
                     "catalog": catalog_filename(self.models[model.id]),
                     "context_window": self.models[model.id].context_window,
                     "max_context_window": self.models[model.id].max_context_window,

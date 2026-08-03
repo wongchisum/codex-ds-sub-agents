@@ -23,6 +23,6 @@ https://github.com/wongchisum/codex-custom-subagents
 8. 如果 configure 返回 exit 3，原样展示交互式凭证命令并暂停，让我在本机终端输入。
 9. 凭证保存后重复完全相同的 configure 命令，运行 doctor。
 10. doctor 全部通过后，明确告诉我：当前 Codex 任务不会热加载新 agent，必须新建任务。
-11. 新任务使用 $codex-custom-subagents；不得继续使用旧的 $deepseek-delegation 或 $codex-custom-agents 名称。
+11. 新任务使用 $codex-custom-subagent；不得继续使用旧的 $deepseek-delegation、$codex-custom-agents 或 $codex-custom-subagents 名称。
 12. 不提交、不推送、不修改 Git remote，不显示或转存任何凭证值。
 ```

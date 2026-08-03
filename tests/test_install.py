@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.test_support import create_symlink_or_skip
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SCRIPT = PROJECT_ROOT / "scripts" / "install.py"
@@ -145,7 +147,7 @@ class InstallTests(unittest.TestCase):
             outside = root / "existing-selection.json"
             previous = b'{"selection": {"primary": "existing-model"}}\n'
             outside.write_bytes(previous)
-            selection.symlink_to(outside)
+            create_symlink_or_skip(self, selection, outside)
             manifest = PROJECT_ROOT / "config" / "gemini-anthropic.example.json"
 
             with self.assertRaisesRegex(install.InstallError, "symlink"):
@@ -412,21 +414,24 @@ class InstallTests(unittest.TestCase):
             agent = (codex_home / "agents" / "deepseek-worker.toml").read_text(encoding="utf-8")
             config = (codex_home / "config.toml").read_text(encoding="utf-8")
             self.assertNotIn("__CODEX_HOME__", agent)
-            self.assertIn(str(codex_home), agent)
+            self.assertIn(install.toml_path_escape(str(codex_home)), agent)
             real_headers = [
                 line for line in config.splitlines() if line.strip() == "[model_providers.deepseek]"
             ]
             self.assertEqual(1, len(real_headers))
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "codex-custom-subagents" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-subagent" / "SKILL.md").is_file())
 
     def test_codex_home_falls_back_when_env_is_blank(self) -> None:
+        expected_home = Path.home() / ".codex"
         with patch.dict(os.environ, {"CODEX_HOME": "   "}):
-            self.assertEqual(Path.home() / ".codex", install.resolve_codex_home())
+            self.assertEqual(expected_home, install.resolve_codex_home())
         with patch.dict(os.environ, {"CODEX_HOME": ""}):
-            self.assertEqual(Path.home() / ".codex", install.resolve_codex_home())
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(Path.home() / ".codex", install.resolve_codex_home())
+            self.assertEqual(expected_home, install.resolve_codex_home())
+        with patch.dict(os.environ, {}, clear=True), patch.object(
+            install.Path, "home", return_value=expected_home.parent
+        ):
+            self.assertEqual(expected_home, install.resolve_codex_home())
         with patch.dict(os.environ, {"CODEX_HOME": "/tmp/custom-codex"}):
             self.assertEqual(Path("/tmp/custom-codex"), install.resolve_codex_home())
 
@@ -481,7 +486,12 @@ class InstallTests(unittest.TestCase):
             codex_home = root / "codex-home"
             codex_home.mkdir()
             (codex_home / "skills").mkdir()
-            (codex_home / "skills" / "codex-custom-subagents").symlink_to(outside, target_is_directory=True)
+            create_symlink_or_skip(
+                self,
+                codex_home / "skills" / "codex-custom-subagent",
+                outside,
+                target_is_directory=True,
+            )
 
             result = run_install(codex_home)
 
@@ -497,7 +507,7 @@ class InstallTests(unittest.TestCase):
             outside_config.write_text("original", encoding="utf-8")
             codex_home = root / "codex-home"
             codex_home.mkdir()
-            (codex_home / "config.toml").symlink_to(outside_config)
+            create_symlink_or_skip(self, codex_home / "config.toml", outside_config)
 
             result = run_install(codex_home)
 
@@ -537,7 +547,7 @@ class InstallTests(unittest.TestCase):
             codex_home = Path(directory) / "codex-home"
             first = run_install(codex_home)
             self.assertEqual(0, first.returncode, first.stderr)
-            skill_dest = codex_home / "skills" / "codex-custom-subagents"
+            skill_dest = codex_home / "skills" / "codex-custom-subagent"
             manifest_path = skill_dest / install.SKILL_MANIFEST
             manifest = install.json.loads(manifest_path.read_text(encoding="utf-8"))
             stale = skill_dest / "obsolete.txt"

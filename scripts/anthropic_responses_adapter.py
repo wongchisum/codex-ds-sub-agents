@@ -256,7 +256,10 @@ class AnthropicAdapterHandler(BaseHTTPRequestHandler):
                     status,
                     {
                         "error": {
-                            "message": "missing bearer credential",
+                            "message": (
+                                "missing bearer credential from the Codex provider auth command; "
+                                "run delegation auth preflight in the same user context"
+                            ),
                             "type": error_category,
                         }
                     },

@@ -59,7 +59,7 @@ Start a new Codex task after each agent installation or switch:
 
 1. Read `subagent-selection.json` and verify the primary, agent, provider, and
    remote model.
-2. Use `$codex-custom-subagents` for a read-only task and confirm the atomic
+2. Use `$codex-custom-subagent` for a read-only task and confirm the atomic
    claim receipt contains the expected agent, model, and provider.
 3. Run a second tool loop that edits a temporary test file and executes tests;
    the parent must inspect the real artifact.

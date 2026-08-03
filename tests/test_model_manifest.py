@@ -70,13 +70,24 @@ class ModelManifestTests(unittest.TestCase):
         )
         self.assertIn('model = "claude-opus-4-6"', agent)
         self.assertIn('model_provider = "aicodemirror_claude"', agent)
-        self.assertIn(
-            'model_catalog_json = "/tmp/codex-home/models/aicodemirror_claude--claude-opus-4-6.json"',
-            agent,
+        expected_catalog = "model_catalog_json = " + json.dumps(
+            str(Path("/tmp/codex-home") / "models" / "aicodemirror_claude--claude-opus-4-6.json")
         )
-        self.assertIn("/tmp/codex-home", agent)
+        self.assertIn(expected_catalog, agent)
+        self.assertIn(mm.toml_path_escape(str(Path("/tmp/codex-home"))), agent)
         self.assertIn("declared configuration value", agent)
         self.assertNotIn("__", agent)
+
+    def test_normalized_selection_contains_only_auth_references(self) -> None:
+        manifest = mm.load_manifest(EXAMPLE)
+        normalized = manifest.normalized_selection()
+        auth = normalized["models"]["claude-opus-4-6"]["auth"]
+        self.assertEqual(
+            {"type": "keychain", "name": "aicodemirror-api-key", "account": "codex"},
+            auth,
+        )
+        self.assertNotIn("secret", json.dumps(normalized).lower())
+        self.assertNotIn("token", json.dumps(normalized).lower())
 
     def test_render_agent_escapes_windows_paths_and_python_command(self) -> None:
         manifest = mm.load_manifest(EXAMPLE)

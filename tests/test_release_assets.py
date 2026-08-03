@@ -89,24 +89,25 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertIn("claim_task.py", parsed["developer_instructions"])
 
     def test_skill_frontmatter_is_valid(self) -> None:
-        skill = PROJECT_ROOT / "skills" / "codex-custom-subagents" / "SKILL.md"
+        skill = PROJECT_ROOT / "skills" / "codex-custom-subagent" / "SKILL.md"
         self.assertTrue(skill.is_file())
         match = re.match(r"^---\n(.*?)\n---\n", skill.read_text(encoding="utf-8"), re.DOTALL)
         self.assertIsNotNone(match, "SKILL.md must start with YAML frontmatter")
         frontmatter = match.group(1)
-        self.assertIn("name: codex-custom-subagents", frontmatter)
+        self.assertIn("name: codex-custom-subagent", frontmatter)
         description = re.search(r"^description: (.+)$", frontmatter, re.MULTILINE)
         self.assertIsNotNone(description, "frontmatter must have a description")
         self.assertTrue(description.group(1).strip())
         self.assertTrue(
-            (PROJECT_ROOT / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py").is_file()
+            (PROJECT_ROOT / "skills" / "codex-custom-subagent" / "scripts" / "claim_task.py").is_file()
         )
         interface = (
-            PROJECT_ROOT / "skills" / "codex-custom-subagents" / "agents" / "openai.yaml"
+            PROJECT_ROOT / "skills" / "codex-custom-subagent" / "agents" / "openai.yaml"
         ).read_text(encoding="utf-8")
-        self.assertIn('display_name: "Custom Subagent Delegation"', interface)
-        self.assertIn("$codex-custom-subagents", interface)
+        self.assertIn('display_name: "Codex Custom Subagents"', interface)
+        self.assertIn("$codex-custom-subagent", interface)
         self.assertFalse((PROJECT_ROOT / "skills" / "codex-custom-agents").exists())
+        self.assertFalse((PROJECT_ROOT / "skills" / "codex-custom-subagents").exists())
 
     def test_minimum_version_is_consistent_across_repo(self) -> None:
         self.assertEqual(MINIMAL_CLIENT_VERSION, load_model_catalog()["models"][0]["minimal_client_version"])
@@ -167,7 +168,7 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertEqual("Codex Custom Subagents", manifest["interface"]["displayName"])
         self.assertEqual("./skills/", manifest["skills"])
         self.assertIn(
-            "$codex-custom-subagents",
+            "$codex-custom-subagent",
             " ".join(manifest["interface"]["defaultPrompt"]),
         )
         self.assertIn("Codex Desktop subagents", manifest["description"])

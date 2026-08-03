@@ -1,12 +1,13 @@
 ---
-name: codex-custom-subagents
+name: codex-custom-subagent
 description: Delegate bounded tasks to configured external-model workers in Codex Desktop through an atomic workspace mailbox. Use for legacy deepseek_worker agents and manifest-selected model workers whose native task messages may not be visible to the provider.
 ---
 
 # Custom Subagent Delegation
 
-The skill ID is `codex-custom-subagents`. The legacy `deepseek-delegation` and
-`codex-custom-agents` install paths are migrated by `scripts/migrate_skill.py`
+The skill ID is `codex-custom-subagent`. The legacy `deepseek-delegation`,
+`codex-custom-agents`, and `codex-custom-subagents` install paths are migrated by
+`scripts/migrate_skill.py`
 and are never installed as second live skills. The selected worker may use
 DeepSeek, Claude, Gemini, or another configured model.
 
@@ -20,6 +21,9 @@ model and ordered fallbacks. Read it before creating workers:
 1. Before spawning, create one durable run state:
    `delegation_runtime.py --workspace . begin --run-id <unique_run_id> --selection "$CODEX_HOME/models/subagent-selection.json"`.
    Use the returned `active.agent`; do not independently reconstruct model bindings.
+   If it returns `code: auth_unavailable`, stop before creating any worker,
+   report the credential/context blocker, and rerun `begin` only after the
+   credential has been made available in the same Codex process context.
 2. Resolve `selection.primary` to `models.<id>.agent` only when auditing the
    runtime output.
 3. Create every worker in the batch with that same agent type. Never mix primary

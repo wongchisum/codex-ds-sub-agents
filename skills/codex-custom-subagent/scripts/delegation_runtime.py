@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -27,12 +28,14 @@ ELIGIBLE_FAILURES = frozenset(
 KNOWN_FAILURES = ELIGIBLE_FAILURES | frozenset(
     {"auth", "invalid_request", "model_not_found", "task_failure", "unknown"}
 )
+AUTH_PREFLIGHT_TIMEOUT_SECONDS = 5.0
 
 
 class RuntimeErrorCode(str, enum.Enum):
     INVALID_INPUT = "invalid_input"
     NOT_FOUND = "not_found"
     CONFLICT = "conflict"
+    AUTH_UNAVAILABLE = "auth_unavailable"
 
 
 class RuntimeFailure(RuntimeError):
@@ -83,7 +86,10 @@ def validate_selection(raw: dict[str, Any]) -> tuple[str, list[str], int, dict[s
         required = ("agent", "provider", "remote_model")
         if any(not isinstance(model.get(key), str) or not model[key] for key in required):
             raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} lacks agent/provider/remote_model")
-        normalized_models[model_id] = {key: model[key] for key in required}
+        normalized = {key: model[key] for key in required}
+        if "auth" in model:
+            normalized["auth"] = _normalize_auth_metadata(model["auth"], model_id)
+        normalized_models[model_id] = normalized
     return primary, fallbacks, min(max_switches, len(fallbacks)), normalized_models
 
 
@@ -170,12 +176,103 @@ def active_descriptor(state: dict[str, Any]) -> dict[str, Any]:
     return {"model_id": model_id, **model}
 
 
+def _codex_home_for_selection(selection_path: Path) -> Path:
+    """Resolve the installed Codex home from its standard selection path."""
+    resolved = selection_path.resolve()
+    if resolved.parent.name.lower() == "models":
+        return resolved.parent.parent
+    return resolved.parent
+
+
+def _normalize_auth_metadata(raw: object, model_id: str) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} auth must be an object")
+    auth_type = raw.get("type")
+    name = raw.get("name")
+    if not isinstance(auth_type, str) or not auth_type:
+        raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} auth.type must be a non-empty string")
+    if not isinstance(name, str) or not name:
+        raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} auth.name must be a non-empty string")
+    if auth_type == "keychain":
+        account = raw.get("account", "codex")
+        if not isinstance(account, str) or not account:
+            raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} auth.account must be a non-empty string")
+        return {"type": auth_type, "name": name, "account": account}
+    if auth_type == "env":
+        return {"type": auth_type, "name": name}
+    if auth_type == "env_header":
+        header = raw.get("header")
+        if not isinstance(header, str) or not header:
+            raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} auth.header must be a non-empty string")
+        return {"type": auth_type, "name": name, "header": header}
+    raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, f"model {model_id} auth.type is unsupported: {auth_type}")
+
+
+def _auth_unavailable(model_id: str, detail: str) -> RuntimeFailure:
+    return RuntimeFailure(
+        RuntimeErrorCode.AUTH_UNAVAILABLE,
+        f"authentication preflight failed for model {model_id}: {detail}; "
+        "worker was not started and no bearer credential was sent",
+    )
+
+
+def _auth_preflight(selection_path: Path, model_id: str, model: dict[str, Any]) -> dict[str, str]:
+    """Verify the credential reference in the same process context as delegation."""
+    raw_auth = model.get("auth")
+    if raw_auth is None:
+        return {"status": "not_declared"}
+    auth = _normalize_auth_metadata(raw_auth, model_id)
+    auth_type = auth["type"]
+    if auth_type in {"env", "env_header"}:
+        if not os.environ.get(auth["name"]):
+            raise _auth_unavailable(
+                model_id,
+                f"environment variable {auth['name']} is unavailable in the current Codex process",
+            )
+        return {**auth, "status": "passed"}
+
+    helper = _codex_home_for_selection(selection_path) / "helpers" / "credential_store.py"
+    if not helper.is_file():
+        raise _auth_unavailable(model_id, f"credential helper is missing: {helper}")
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(helper),
+                "exists",
+                "--account",
+                auth["account"],
+                "--service",
+                auth["name"],
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=AUTH_PREFLIGHT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        raise _auth_unavailable(model_id, "credential store lookup timed out") from None
+    except OSError as error:
+        raise _auth_unavailable(model_id, f"credential store lookup could not start: {error}") from error
+    if result.returncode != 0:
+        raise _auth_unavailable(
+            model_id,
+            f"credential {auth['name']} for account {auth['account']} is unavailable in the current process context",
+        )
+    return {**auth, "status": "passed"}
+
+
 def begin(workspace: Path, run_id: str, selection_path: Path) -> dict[str, Any]:
     path = state_path(workspace, run_id)
     primary, fallbacks, max_switches, models = validate_selection(load_json(selection_path, "selection"))
     with run_lock(path):
         if path.exists():
             raise RuntimeFailure(RuntimeErrorCode.CONFLICT, f"run already exists: {run_id}")
+        auth_preflight = {
+            model_id: _auth_preflight(selection_path, model_id, model)
+            for model_id, model in models.items()
+        }
         state = {
             "schema_version": 1,
             "run_id": run_id,
@@ -188,10 +285,17 @@ def begin(workspace: Path, run_id: str, selection_path: Path) -> dict[str, Any]:
             "switch_count": 0,
             "attempted": [primary],
             "models": models,
+            "auth_preflight": auth_preflight,
             "failures": [],
         }
         atomic_write(path, state)
-    return {"status": "started", "run_id": run_id, "path": str(path), "active": active_descriptor(state)}
+    return {
+        "status": "started",
+        "run_id": run_id,
+        "path": str(path),
+        "active": active_descriptor(state),
+        "auth_preflight": auth_preflight[primary],
+    }
 
 
 def record_failure(workspace: Path, run_id: str, failure: dict[str, Any]) -> dict[str, Any]:

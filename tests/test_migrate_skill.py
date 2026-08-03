@@ -1,4 +1,4 @@
-"""Migration tests for predecessor skill names → `codex-custom-subagents`."""
+"""Migration tests for predecessor skill names → `codex-custom-subagent`."""
 
 from __future__ import annotations
 
@@ -74,7 +74,11 @@ class MigrateSkillTests(unittest.TestCase):
             self.assertIn("no managed legacy", result.stdout)
             self.assertTrue((codex_home / "skills" / NEW_SKILL / "SKILL.md").is_file())
             agent = (codex_home / "agents" / "deepseek-worker.toml").read_text(encoding="utf-8")
-            self.assertIn(f"{codex_home}/skills/{NEW_SKILL}/scripts/claim_task.py", agent)
+            expected_claim_path = (
+                install.toml_path_escape(str(codex_home))
+                + f"/skills/{NEW_SKILL}/scripts/claim_task.py"
+            )
+            self.assertIn(expected_claim_path, agent)
             for legacy_skill in LEGACY_SKILLS:
                 self.assertFalse((codex_home / "skills" / legacy_skill).exists())
                 self.assertNotIn(f"skills/{legacy_skill}/scripts/claim_task.py", agent)
@@ -94,7 +98,7 @@ class MigrateSkillTests(unittest.TestCase):
                 current_skill = codex_home / "skills" / NEW_SKILL / "SKILL.md"
                 self.assertTrue(current_skill.is_file())
                 self.assertIn(
-                    "name: codex-custom-subagents",
+                    "name: codex-custom-subagent",
                     current_skill.read_text(encoding="utf-8"),
                 )
 

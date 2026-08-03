@@ -50,7 +50,7 @@ test output.
 | Full automated suite | PASS | 301 passed on Python 3.13; Python 3.9 passed 298 and skipped 3 TOML checks |
 | Python compilation | PASS | bytecode cache redirected to `/private/tmp` |
 
-The plugin manifest and `$codex-custom-subagents` Skill were also validated with
+The plugin manifest and `$codex-custom-subagent` Skill were also validated with
 their Codex validators after the project rename. This report retains older
 endpoint and session evidence below; historical local paths are evidence, not
 current product names.

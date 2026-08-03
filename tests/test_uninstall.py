@@ -11,6 +11,8 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.test_support import create_symlink_or_skip
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import uninstall as uninstall_module  # noqa: E402
 
@@ -269,7 +271,7 @@ class UninstallTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertTrue((codex_home / "agents" / "deepseek-worker.toml").is_file())
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "codex-custom-subagents" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-subagent" / "SKILL.md").is_file())
             self.assertFalse((codex_home / "agents" / "deepseek_anthropic_worker.toml").exists())
             self.assertFalse(
                 (codex_home / "models" / "deepseek_anthropic--deepseek-v4-flash.json").exists()
@@ -299,7 +301,7 @@ class UninstallTests(unittest.TestCase):
                 (codex_home / "models" / "deepseek_anthropic--deepseek-v4-flash.json").is_file()
             )
             self.assertTrue((codex_home / "models" / "subagent-selection.json").is_file())
-            self.assertTrue((codex_home / "skills" / "codex-custom-subagents" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-subagent" / "SKILL.md").is_file())
             self.assertTrue((codex_home / "adapters" / "anthropic_responses_adapter.py").is_file())
             config = (codex_home / "config.toml").read_text(encoding="utf-8")
             self.assertNotIn("[model_providers.deepseek]", config)
@@ -316,7 +318,7 @@ class UninstallTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertFalse((codex_home / "agents" / "deepseek-worker.toml").exists())
             self.assertFalse((codex_home / "models" / "deepseek-v4-flash.json").exists())
-            self.assertFalse((codex_home / "skills" / "codex-custom-subagents").exists())
+            self.assertFalse((codex_home / "skills" / "codex-custom-subagent").exists())
             config = codex_home / "config.toml"
             self.assertTrue(config.exists())
             self.assertNotIn("[model_providers.deepseek]", config.read_text(encoding="utf-8"))
@@ -359,14 +361,14 @@ class UninstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             codex_home = Path(directory) / "codex-home"
             self.assertEqual(0, install(codex_home).returncode)
-            extra = codex_home / "skills" / "codex-custom-subagents" / "user-notes.md"
+            extra = codex_home / "skills" / "codex-custom-subagent" / "user-notes.md"
             extra.write_text("user content\n", encoding="utf-8")
 
             result = uninstall(codex_home)
 
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertTrue(extra.is_file())
-            self.assertFalse((codex_home / "skills" / "codex-custom-subagents" / "SKILL.md").exists())
+            self.assertFalse((codex_home / "skills" / "codex-custom-subagent" / "SKILL.md").exists())
             self.assertIn("preserved", result.stdout)
 
     def test_uninstall_backs_up_config_before_removing_provider(self) -> None:
@@ -392,7 +394,7 @@ class UninstallTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertTrue((codex_home / "agents" / "deepseek-worker.toml").is_file())
             self.assertTrue((codex_home / "models" / "deepseek-v4-flash.json").is_file())
-            self.assertTrue((codex_home / "skills" / "codex-custom-subagents" / "SKILL.md").is_file())
+            self.assertTrue((codex_home / "skills" / "codex-custom-subagent" / "SKILL.md").is_file())
             self.assertEqual(config_before, (codex_home / "config.toml").read_text(encoding="utf-8"))
             self.assertIn("would remove", result.stdout)
 
@@ -417,7 +419,9 @@ class UninstallTests(unittest.TestCase):
             outside = root / "outside-agent.toml"
             outside.write_text("keep", encoding="utf-8")
             (codex_home / "agents").mkdir()
-            (codex_home / "agents" / "deepseek-worker.toml").symlink_to(outside)
+            create_symlink_or_skip(
+                self, codex_home / "agents" / "deepseek-worker.toml", outside
+            )
 
             result = uninstall(codex_home)
 

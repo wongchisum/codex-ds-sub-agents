@@ -21,9 +21,31 @@ Codex loads the agent registry when a task starts. Doctor cannot hot-load a newl
 1. Finish configure and doctor.
 2. Close the task that performed the installation.
 3. Start a new Codex task.
-4. Read `subagent-selection.json` and use `$codex-custom-subagents`.
+4. Read `subagent-selection.json` and use `$codex-custom-subagent`.
 
 Do not classify `unknown agent_type` as a network, billing, or rate-limit failure, and do not switch to a fallback.
+
+## Worker startup fails with `401 missing bearer credential`
+
+The loopback adapter requires Codex to provide the bearer token through the
+configured provider auth command. Current installations run an auth preflight
+before spawning a worker. If `delegation_runtime.py begin` returns
+`auth_unavailable`, the worker was not started; reinject the credential and run
+`begin` again under the same Windows user/security context as Codex. For a
+Credential Manager entry, verify the exact service and account without printing
+the value:
+
+```powershell
+& "<python.exe>" "$env:USERPROFILE\.codex\helpers\credential_store.py" exists `
+  --account codex --service deepseek-api-key
+```
+
+Do not remove the adapter's bearer check or add the secret to a task file,
+selection JSON, command-line argument, or diagnostic bundle. `401` after a
+successful preflight indicates stale Codex provider configuration or a process
+running under a different Windows security context; restart Codex after
+reinstalling the generated provider configuration and compare `whoami` in the
+same context.
 
 ## Windows resolves `python3` to the Store shim
 

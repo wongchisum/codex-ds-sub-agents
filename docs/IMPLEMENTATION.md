@@ -11,6 +11,7 @@ English · [简体中文](zh-CN/IMPLEMENTATION.md)
 5. It writes `subagent-selection.json`, mapping model IDs to agent, provider, remote model, and context declarations.
 6. For `upstream_protocol=anthropic_messages`, it derives a local adapter and installs a macOS LaunchAgent or Windows Task Scheduler task bound to that provider identity.
 7. Configure runs doctor. The user then starts a new Codex task, where the Skill calls `delegation_runtime.py begin` to resolve the single `active.agent`.
+8. `begin` performs an authentication preflight in the same process context that will delegate the workers. It checks the declared environment reference or invokes the installed credential helper without exposing the credential value. If the lookup fails, it returns `auth_unavailable` before any worker is started.
 
 ## Why task bodies use files
 
@@ -42,6 +43,8 @@ Each `runs/<run-id>.json` stores:
 - failure classification and final outcome.
 
 The parent calls `record-failure` only after provider transport retries are exhausted. Before switching, it confirms every old worker stopped. Completed work stays accepted; only incomplete claims are recovered. Accepted runs finish with `--outcome completed`, while an ineligible or exhausted failure finishes as `blocked`.
+
+Authentication failures are intentionally not fallback-eligible. A missing bearer credential is a local configuration/context problem, not a transient upstream failure. Reinject the credential and rerun `begin` in the same Windows user context; do not bypass the loopback adapter's bearer check.
 
 ## Atomic installation and rollback
 

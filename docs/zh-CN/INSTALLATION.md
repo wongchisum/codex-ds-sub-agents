@@ -10,7 +10,7 @@
 ~/.codex/
 ├── agents/                         # worker 定义
 ├── models/                         # model catalog 与 subagent-selection.json
-├── skills/codex-custom-subagents/     # 当前 Skill：$codex-custom-subagents
+├── skills/codex-custom-subagent/      # 当前 Skill：$codex-custom-subagent
 ├── adapters/                       # Anthropic Messages adapter
 ├── logs/adapters/                  # 运行日志与不含正文的审计日志
 ├── logs/custom-subagents/          # configure 分阶段日志，输出已脱敏

@@ -6,10 +6,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_SCRIPTS = ROOT / "skills" / "codex-custom-subagents" / "scripts"
+SKILL_SCRIPTS = ROOT / "skills" / "codex-custom-subagent" / "scripts"
 sys.path.insert(0, str(SKILL_SCRIPTS))
 MODULE_PATH = SKILL_SCRIPTS / "delegation_runtime.py"
 SPEC = importlib.util.spec_from_file_location("delegation_runtime", MODULE_PATH)
@@ -26,6 +27,16 @@ def selection() -> dict:
             "fallback": {"agent": "fallback_worker", "provider": "provider_b", "remote_model": "model-b"},
         },
     }
+
+
+def keychain_selection() -> dict:
+    value = selection()
+    value["models"]["primary"]["auth"] = {
+        "type": "keychain",
+        "name": "deepseek-api-key",
+        "account": "codex",
+    }
+    return value
 
 
 class FailureClassificationTests(unittest.TestCase):
@@ -147,6 +158,44 @@ class RuntimeStateTests(unittest.TestCase):
                     "message": "x" * (runtime.MAX_FAILURE_MESSAGE_CHARS + 1),
                 },
             )
+
+    def test_auth_preflight_blocks_worker_when_credential_is_unavailable(self) -> None:
+        codex_home = self.workspace / "codex-home"
+        selection_path = codex_home / "models" / "subagent-selection.json"
+        selection_path.parent.mkdir(parents=True)
+        selection_path.write_text(json.dumps(keychain_selection()), encoding="utf-8")
+        helper = codex_home / "helpers" / "credential_store.py"
+        helper.parent.mkdir(parents=True)
+        helper.write_text("# test helper\n", encoding="utf-8")
+
+        with mock.patch.object(runtime.subprocess, "run", return_value=mock.Mock(returncode=1)) as run:
+            with self.assertRaises(runtime.RuntimeFailure) as caught:
+                runtime.begin(self.workspace, "auth_missing", selection_path)
+
+        self.assertEqual(runtime.RuntimeErrorCode.AUTH_UNAVAILABLE, caught.exception.code)
+        self.assertIn("worker was not started", str(caught.exception))
+        self.assertIn("current process context", str(caught.exception))
+        self.assertFalse(runtime.state_path(self.workspace, "auth_missing").exists())
+        command = run.call_args.args[0]
+        self.assertEqual("exists", command[2])
+        self.assertNotIn("credential-secret", json.dumps(command))
+
+    def test_auth_preflight_is_persisted_without_secret_values(self) -> None:
+        codex_home = self.workspace / "codex-home"
+        selection_path = codex_home / "models" / "subagent-selection.json"
+        selection_path.parent.mkdir(parents=True)
+        selection_path.write_text(json.dumps(keychain_selection()), encoding="utf-8")
+        helper = codex_home / "helpers" / "credential_store.py"
+        helper.parent.mkdir(parents=True)
+        helper.write_text("# test helper\n", encoding="utf-8")
+
+        with mock.patch.object(runtime.subprocess, "run", return_value=mock.Mock(returncode=0)):
+            started = runtime.begin(self.workspace, "auth_ready", selection_path)
+
+        self.assertEqual("passed", started["auth_preflight"]["status"])
+        state = runtime.show(self.workspace, "auth_ready")
+        self.assertEqual("deepseek-api-key", state["auth_preflight"]["primary"]["name"])
+        self.assertNotIn("credential-secret", json.dumps(state))
 
 
 if __name__ == "__main__":

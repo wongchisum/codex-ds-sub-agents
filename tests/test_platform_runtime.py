@@ -44,7 +44,7 @@ class CodexDiscoveryTests(unittest.TestCase):
             runtime.sys, "platform", "darwin"
         ), patch.object(runtime.Path, "is_file", return_value=True):
             self.assertEqual(
-                "/Applications/ChatGPT.app/Contents/Resources/codex",
+                str(runtime.Path("/Applications/ChatGPT.app/Contents/Resources/codex")),
                 runtime.codex_executable(),
             )
 
@@ -61,10 +61,10 @@ class AdapterPathsTests(unittest.TestCase):
             runtime.os.environ, {"LOCALAPPDATA": r"C:\Users\alice\AppData\Local"}
         ):
             paths = runtime.adapter_paths(Path(r"C:\codex"))
-        self.assertEqual(r"C:\codex/adapters", paths.scripts_dir.as_posix())
-        self.assertEqual(r"C:\codex/logs/adapters", paths.logs_dir.as_posix())
+        self.assertEqual("C:/codex/adapters", paths.scripts_dir.as_posix())
+        self.assertEqual("C:/codex/logs/adapters", paths.logs_dir.as_posix())
         self.assertEqual(
-            r"C:\Users\alice\AppData\Local/Codex/SubagentAdapters",
+            "C:/Users/alice/AppData/Local/Codex/SubagentAdapters",
             paths.definitions_dir.as_posix(),
         )
 

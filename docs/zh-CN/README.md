@@ -19,7 +19,7 @@
 
 - [系统架构](ARCHITECTURE.md)：模块职责、请求路径、单模型批次和任务信箱。
 - [实现原理](IMPLEMENTATION.md)：安装事务、回执、fallback 状态和安全边界。
-- [Skill 迁移](MIGRATION.md)：从旧 `$deepseek-delegation` 或 `$codex-custom-agents` 安装迁移到 `$codex-custom-subagents`。
+- [Skill 迁移](MIGRATION.md)：从旧 `$deepseek-delegation`、`$codex-custom-agents` 或 `$codex-custom-subagents` 安装迁移到 `$codex-custom-subagent`。
 - [故障排查](TROUBLESHOOTING.md)：安装失败、agent 缓存、凭证和 adapter 日志。
 
 ## 测试

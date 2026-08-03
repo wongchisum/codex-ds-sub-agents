@@ -29,8 +29,8 @@
     ],
     "websiteURL": "https://github.com/wongchisum/codex-custom-subagents",
     "defaultPrompt": [
-      "Use $codex-custom-subagents to delegate this task to the configured custom subagent.",
-      "Use $codex-custom-subagents to split this work into parallel subagent tasks."
+      "Use $codex-custom-subagent to delegate this task to the configured custom subagent.",
+      "Use $codex-custom-subagent to split this work into parallel subagent tasks."
     ]
   }
 }

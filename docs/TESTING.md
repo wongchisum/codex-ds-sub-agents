@@ -7,7 +7,7 @@ English · [简体中文](zh-CN/TESTING.md)
 ```bash
 python3 -m unittest discover -s tests -v
 python3 tests/test_release_assets.py
-python3 -m py_compile scripts/*.py skills/codex-custom-subagents/scripts/*.py
+python3 -m py_compile scripts/*.py skills/codex-custom-subagent/scripts/*.py
 ```
 
 The suite covers configuration, manifest validation, selection and fallback,

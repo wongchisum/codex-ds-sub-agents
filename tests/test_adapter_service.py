@@ -17,6 +17,7 @@ import adapter_service as service  # noqa: E402
 from model_manifest import load_manifest  # noqa: E402
 
 
+@unittest.skipUnless(sys.platform == "darwin", "macOS launchctl backend tests")
 class AdapterServiceTests(unittest.TestCase):
     class _HealthResponse:
         def __init__(self, payload: object, status: int = 200) -> None:

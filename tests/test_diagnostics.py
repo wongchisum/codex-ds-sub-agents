@@ -50,7 +50,7 @@ class TailAndBoundsTests(unittest.TestCase):
     def test_bounded_tail_returns_last_lines(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "log.txt"
-            path.write_text("line0\nline1\nline2\nline3\n", encoding="utf-8")
+            path.write_bytes(b"line0\nline1\nline2\nline3\n")
             content, meta = diagnostics.bounded_tail(path, max_lines=2, max_bytes=1024)
             self.assertEqual(b"line2\nline3\n", content)
             self.assertEqual(2, meta["tail_lines"])
