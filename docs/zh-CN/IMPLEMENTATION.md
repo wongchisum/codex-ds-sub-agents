@@ -16,7 +16,10 @@
 
 自定义 provider 的原生父子消息在部分 Desktop 版本和协议组合中无法稳定携带完整任务正文。任务正文如果只存在于 spawn message，worker 可能收到空任务或只有加密块。
 
-父任务因此先写入完整任务文件，再创建 worker。文件协议头保持 `# DeepSeek task handoff v1`，这是兼容标识，不代表模型必须是 DeepSeek。改头会让旧任务文件被拒绝，所以项目改名不修改协议 v1。
+父任务因此先写入完整任务文件，再创建 worker。新文件存放在
+`.codex-custom-subagents/`，并使用
+`# Codex Custom Subagents task handoff v1`。只有显式增加
+`--legacy-mailbox` 来完成升级前任务时，程序才读取旧 DeepSeek 协议头和旧信箱。
 
 领取时：
 

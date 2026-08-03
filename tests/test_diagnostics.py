@@ -205,7 +205,7 @@ class ExclusionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             ws = root / "ws"
-            claimed = ws / ".deepseek-delegations" / "claimed"
+            claimed = ws / ".codex-custom-subagents" / "claimed"
             claimed.mkdir(parents=True)
             receipt = {
                 "schema_version": 1,
@@ -231,8 +231,45 @@ class ExclusionTests(unittest.TestCase):
             self.assertNotIn("sk-secret123", content)
             self.assertIn("<redacted>", content)
             summary = json.loads(content)
+            self.assertEqual(".codex-custom-subagents", summary["mailbox"])
+            self.assertFalse(summary["legacy"])
             self.assertEqual(1, len(summary["receipts"]))
             self.assertEqual("task_one", summary["receipts"][0]["task_id"])
+
+    def test_legacy_mailbox_is_read_only_fallback_for_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ws = root / "ws"
+            claimed = ws / ".deepseek-delegations" / "claimed"
+            claimed.mkdir(parents=True)
+            receipt = {
+                "schema_version": 1,
+                "status": "completed",
+                "task_id": "legacy_task",
+                "claim_id": "1111-abc",
+                "attempt_id": "attempt-1",
+            }
+            (claimed / "legacy_task--1111-abc.md.receipt").write_text(
+                json.dumps(receipt),
+                encoding="utf-8",
+            )
+
+            bundle_path, _items = diagnostics.collect(
+                run="legacy_receipts",
+                out=root / "out",
+                fmt="dir",
+                codex_home=root / "home",
+                workspace=ws,
+                skip_adapter_health=True,
+                probe_codex=False,
+            )
+
+            summary = json.loads(
+                (bundle_path / "mailbox" / "summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(".deepseek-delegations", summary["mailbox"])
+            self.assertTrue(summary["legacy"])
+            self.assertEqual("legacy_task", summary["receipts"][0]["task_id"])
 
 
 if __name__ == "__main__":

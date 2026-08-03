@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Atomic claim and recovery for a Codex Custom Subagents task pool.
 
-The pool lives at the calling thread's REAL cwd (``.deepseek-delegations``):
+The pool lives at the calling thread's REAL cwd (``.codex-custom-subagents``):
 relative ``--workspace`` values are resolved against the process cwd and all
 symlinks are resolved, so threads sharing a logical path share one pool. The
 project a task operates on is independent of the pool and is given as an
@@ -28,7 +28,11 @@ from platform_lock import PlatformLockError, platform_file_lock
 
 TASK_ID_PATTERN = re.compile(r"[a-z0-9_]{1,64}")
 CLAIM_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
-HEADER = "# DeepSeek task handoff v1"
+MAILBOX_NAME = ".codex-custom-subagents"
+LEGACY_MAILBOX_NAME = ".deepseek-delegations"
+HEADER = "# Codex Custom Subagents task handoff v1"
+LEGACY_HEADER = "# DeepSeek task handoff v1"
+SUPPORTED_HEADERS = frozenset({HEADER, LEGACY_HEADER})
 RECEIPT_SCHEMA_VERSION = 1
 TERMINAL_STATUSES = frozenset({"completed", "failed", "recovered", "rejected", "orphaned"})
 METADATA_FIELDS = ("parent_thread_id", "worker_thread_id", "agent", "model", "provider")
@@ -39,8 +43,9 @@ METADATA_LINES = 3
 
 
 class Pool:
-    def __init__(self, workspace: Path) -> None:
-        mailbox = workspace / ".deepseek-delegations"
+    def __init__(self, workspace: Path, *, legacy_mailbox: bool = False) -> None:
+        self.legacy_mailbox = legacy_mailbox
+        mailbox = workspace / (LEGACY_MAILBOX_NAME if legacy_mailbox else MAILBOX_NAME)
         self.mailbox = mailbox
         self.lock = mailbox / ".lock"
         self.pending = mailbox / "pending"
@@ -94,13 +99,19 @@ def split_claim_name(name: str) -> tuple[str, str] | None:
     return task_id, claim_id
 
 
-def validate_task(path: Path, task_id: str) -> str | None:
+def validate_task(
+    path: Path,
+    task_id: str,
+    *,
+    allow_legacy_header: bool = False,
+) -> str | None:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError) as error:
         return f"cannot read task: {error}"
 
-    if not lines or lines[0] != HEADER:
+    supported_headers = SUPPORTED_HEADERS if allow_legacy_header else frozenset({HEADER})
+    if not lines or lines[0] not in supported_headers:
         return f"first line must be {HEADER!r}"
 
     metadata = lines[1 : 1 + METADATA_LINES]
@@ -218,7 +229,11 @@ def _claim_one_locked(pool: Pool, metadata: dict[str, str | None]) -> int:
             emit({"status": "skipped", "reason": "invalid_task_id", "task_id": task_id, "path": str(candidate)}, to_stderr=True)
             continue
 
-        validation_error = validate_task(candidate, task_id)
+        validation_error = validate_task(
+            candidate,
+            task_id,
+            allow_legacy_header=pool.legacy_mailbox,
+        )
         if validation_error is not None:
             rejected_path = pool.rejected / f"{task_id}--{new_claim_id()}.md"
             try:
@@ -403,7 +418,11 @@ def _recover_locked(
         if receipt_payload is not None:
             receipt_error = validate_receipt_identity(receipt_payload, task_id, claim_id)
 
-        validation_error = validate_task(claimed_file, task_id)
+        validation_error = validate_task(
+            claimed_file,
+            task_id,
+            allow_legacy_header=pool.legacy_mailbox,
+        )
         if validation_error is not None:
             entry = {"task_id": task_id, "claim_id": claim_id, "path": str(claimed_file), "reason": validation_error}
             if dry_run:
@@ -647,10 +666,19 @@ def add_finalize_args(parser: argparse.ArgumentParser) -> None:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Atomically claim and audit DeepSeek delegation task attempts.",
+        description="Atomically claim and audit custom-subagent task attempts.",
         allow_abbrev=False,
     )
-    parser.add_argument("--workspace", default=".", help="pool root; defaults to the real cwd ('.deepseek-delegations' inside it)")
+    parser.add_argument(
+        "--workspace",
+        default=".",
+        help="pool root; defaults to the real cwd ('.codex-custom-subagents' inside it)",
+    )
+    parser.add_argument(
+        "--legacy-mailbox",
+        action="store_true",
+        help="use the legacy .deepseek-delegations pool only to finish pre-upgrade work",
+    )
     parser.add_argument(
         "--allow-workspace-mismatch",
         "--allow-non-cwd-workspace",
@@ -706,7 +734,7 @@ def main(argv: list[str] | None = None) -> int:
             "real_cwd": str(real_cwd),
         }, to_stderr=True)
 
-    pool = Pool(workspace)
+    pool = Pool(workspace, legacy_mailbox=args.legacy_mailbox)
     if args.command == "recover":
         target = pool.recovered if args.to == "recovered" else pool.pending
         return recover(pool, set(args.task_id), set(args.claim_id), args.all, args.dry_run, target)

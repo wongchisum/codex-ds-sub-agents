@@ -14,10 +14,15 @@ from tests.test_support import create_symlink_or_skip
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py"
-HEADER = "# DeepSeek task handoff v1"
+HEADER = "# Codex Custom Subagents task handoff v1"
+LEGACY_HEADER = "# DeepSeek task handoff v1"
 
 
 def mailbox(workspace: Path) -> Path:
+    return workspace / ".codex-custom-subagents"
+
+
+def legacy_mailbox(workspace: Path) -> Path:
     return workspace / ".deepseek-delegations"
 
 
@@ -36,10 +41,13 @@ def run(
     *args: str,
     cwd: Path | None = None,
     allow_workspace_mismatch: bool = False,
+    use_legacy_mailbox: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     command = [sys.executable, str(CLAIM_SCRIPT), "--workspace", str(workspace)]
     if allow_workspace_mismatch:
         command.append("--allow-workspace-mismatch")
+    if use_legacy_mailbox:
+        command.append("--legacy-mailbox")
     command.extend(args)
     return subprocess.run(
         command,
@@ -59,6 +67,41 @@ def claimed_files(workspace: Path) -> list[Path]:
 
 
 class ClaimTaskTests(unittest.TestCase):
+    def test_legacy_header_is_rejected_from_the_new_mailbox(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            pending = mailbox(workspace) / "pending"
+            pending.mkdir(parents=True)
+            (pending / "task_alpha.md").write_text(
+                f"{LEGACY_HEADER}\n\nTask: task_alpha\n\nReturn task_alpha.\n",
+                encoding="utf-8",
+            )
+
+            result = claim(workspace)
+
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertEqual("empty", json.loads(result.stdout)["status"])
+            self.assertEqual(1, len(list((mailbox(workspace) / "rejected").glob("*.md"))))
+
+    def test_legacy_mailbox_requires_explicit_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            pending = legacy_mailbox(workspace) / "pending"
+            pending.mkdir(parents=True)
+            (pending / "task_alpha.md").write_text(
+                f"{LEGACY_HEADER}\n\nTask: task_alpha\n\nReturn task_alpha.\n",
+                encoding="utf-8",
+            )
+
+            current = claim(workspace)
+            legacy = run(workspace, use_legacy_mailbox=True)
+
+            self.assertEqual(2, current.returncode)
+            self.assertFalse(mailbox(workspace).exists())
+            self.assertEqual(0, legacy.returncode, legacy.stderr)
+            legacy_path = Path(json.loads(legacy.stdout)["path"])
+            self.assertEqual(".deepseek-delegations", legacy_path.parent.parent.name)
+
     def test_parallel_workers_claim_unique_tasks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -99,11 +142,11 @@ class ClaimTaskTests(unittest.TestCase):
             self.assertEqual(2, result.returncode)
             self.assertFalse((mailbox(workspace)).exists())
 
-            workspace.joinpath(".deepseek-delegations", "pending").mkdir(parents=True)
+            workspace.joinpath(".codex-custom-subagents", "pending").mkdir(parents=True)
             result = claim(workspace)
             self.assertEqual(2, result.returncode)
             self.assertEqual(
-                {".deepseek-delegations", ".deepseek-delegations/pending"},
+                {".codex-custom-subagents", ".codex-custom-subagents/pending"},
                 {
                     path.relative_to(workspace).as_posix()
                     for path in workspace.rglob("*")

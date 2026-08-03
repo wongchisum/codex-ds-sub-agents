@@ -48,6 +48,8 @@ DEFAULT_MAX_FILE_BYTES = 512 * 1024
 DEFAULT_CODEX_TIMEOUT = 5.0
 DEFAULT_HEALTH_TIMEOUT = 2.0
 SUMMARY_MAX_CHARS = 200
+MAILBOX_NAME = ".codex-custom-subagents"
+LEGACY_MAILBOX_NAME = ".deepseek-delegations"
 
 ADAPTER_LOG_SUFFIXES = (".audit.jsonl", ".stdout.log", ".stderr.log")
 CONFIGURE_LOG_LIMIT = 5
@@ -591,11 +593,26 @@ def _tail_configure_logs(
 
 
 def _collect_mailbox(workspace: Path, collector: Collector, max_file_bytes: int) -> None:
-    mailbox = workspace / ".deepseek-delegations"
+    current_mailbox = workspace / MAILBOX_NAME
+    legacy_mailbox = workspace / LEGACY_MAILBOX_NAME
+    mailbox = current_mailbox if current_mailbox.is_dir() else legacy_mailbox
     if not mailbox.is_dir():
         collector.write_text(
-            "mailbox/summary.json", json.dumps({"receipts": [], "run_states": [], "note": "no delegation mailbox present"}, indent=2, sort_keys=True) + "\n",
-            str(mailbox), "missing", "no .deepseek-delegations mailbox",
+            "mailbox/summary.json",
+            json.dumps(
+                {
+                    "mailbox": MAILBOX_NAME,
+                    "receipts": [],
+                    "run_states": [],
+                    "note": "no custom-subagent mailbox present",
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            str(current_mailbox),
+            "missing",
+            f"no {MAILBOX_NAME} mailbox",
         )
         return
     receipts = []
@@ -639,7 +656,19 @@ def _collect_mailbox(workspace: Path, collector: Collector, max_file_bytes: int)
             run_states.append(redact_json(value))
     collector.write_text(
         "mailbox/summary.json",
-        json.dumps({"receipts": receipts, "run_states": run_states}, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        json.dumps(
+            {
+                "mailbox": mailbox.name,
+                "legacy": mailbox.name == LEGACY_MAILBOX_NAME,
+                "legacy_mailbox_present": legacy_mailbox.is_dir(),
+                "receipts": receipts,
+                "run_states": run_states,
+            },
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        + "\n",
         str(mailbox),
         "collected",
         None,
@@ -785,7 +814,12 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--out", type=Path, default=Path("."), help="output directory (default: current directory)")
     parser.add_argument("--format", dest="fmt", choices=("dir", "zip"), default="dir", help="bundle format (default: dir)")
     parser.add_argument("--codex-home", type=Path, default=None, help="Codex home to inspect (default: resolved CODEX_HOME)")
-    parser.add_argument("--workspace", type=Path, default=None, help="workspace containing .deepseek-delegations (default: cwd)")
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=None,
+        help="workspace containing .codex-custom-subagents (default: cwd)",
+    )
     parser.add_argument("--manifest", type=Path, default=None, help="explicit manifest JSON to collect (default: from registry)")
     parser.add_argument("--max-tail-lines", type=int, default=DEFAULT_MAX_TAIL_LINES)
     parser.add_argument("--max-tail-bytes", type=int, default=DEFAULT_MAX_TAIL_BYTES)

@@ -85,7 +85,7 @@ active batch 失败
 部分自定义 provider 收到的原生子任务消息可能缺少完整任务正文。skill 因此在父任务真实 cwd 下维护：
 
 ```text
-.deepseek-delegations/
+.codex-custom-subagents/
 ├── pending/     # 尚未领取
 ├── claimed/     # 已原子领取，含 receipt
 ├── rejected/    # 协议头损坏或无法执行
@@ -93,7 +93,14 @@ active batch 失败
 └── runs/        # 运行与 fallback 状态
 ```
 
-父任务先写完整文件，再创建 worker。worker 用同一文件系统内的原子 rename 从 `pending` 移到 `claimed`，随后写入 receipt。`task_id` 必须匹配 `[a-z0-9_]{1,64}`。池路径用 `Path.resolve()` 绑定真实 cwd；`--allow-workspace-mismatch` 只用于明确的旧版兼容。
+父任务先写完整文件，再创建 worker。新任务使用
+`# Codex Custom Subagents task handoff v1`；旧 DeepSeek 协议头仍可读取，用于完成
+升级前任务。worker 用同一文件系统内的原子 rename 从 `pending` 移到 `claimed`，
+随后写入 receipt。`task_id` 必须匹配 `[a-z0-9_]{1,64}`。池路径用
+`Path.resolve()` 绑定真实 cwd；`--allow-workspace-mismatch` 只用于明确兼容场景。
+
+升级前的 `.deepseek-delegations/` 不会与新批次混用。只有在完成或恢复改名前已经
+开始的任务时，才显式使用 `--legacy-mailbox`。
 
 `recover` 不猜测 worker 是否已经死亡。父任务必须先确认 worker 停止，再按 `task_id`、`claim_id` 或 `--all` 恢复。`locate` 发现多个同名 claim 时返回歧义错误，不会随便选一个。
 

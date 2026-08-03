@@ -34,7 +34,20 @@ py -3 scripts\migrate_skill.py
 
 迁移后不提供 `$deepseek-delegation` 或 `$codex-custom-agents` 别名。文档、Prompt 和新任务统一使用 `$codex-custom-subagents`。保留多个并行 Skill 会让 Codex 选择错误入口，也会使后续卸载所有权不清晰。
 
-`.deepseek-delegations/`、`# DeepSeek task handoff v1` 和 `.codex-deepseek-manifest.json` 暂不改名。前两项属于现有任务文件协议，最后一项用于识别旧安装所有权；直接改名会破坏未完成任务或使安全卸载失去依据。
+新批次使用 `.codex-custom-subagents/` 和
+`# Codex Custom Subagents task handoff v1`。程序不会自动移动旧
+`.deepseek-delegations/`：进行中的文件锁和 receipt 内的绝对路径让自动改名存在风险。
+
+开始新批次前检查两个目录。如果旧目录仍有未完成任务，先停止所有旧 worker，
+再给完成或恢复该批次所需的 `claim_task.py`、`delegation_runtime.py` 命令增加
+`--legacy-mailbox`。该选项必须放在子命令前，例如
+`claim_task.py --workspace . --legacy-mailbox recover --dry-run`。不得向旧目录写入
+新任务，也不得合并两个信箱。旧
+`# DeepSeek task handoff v1` 协议头只为这条显式兼容路径保留读取能力。
+
+`.gitignore` 必须同时保留两个信箱路径，避免包含私有仓库上下文的任务正文进入
+Git。`.codex-deepseek-manifest.json` 继续保持旧名，因为安全清理旧 Skill 安装时
+仍靠它判断文件所有权。
 
 ## 任务缓存
 

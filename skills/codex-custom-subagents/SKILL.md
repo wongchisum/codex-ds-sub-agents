@@ -1,6 +1,6 @@
 ---
 name: codex-custom-subagents
-description: Delegate bounded tasks to configured external-model workers in Codex Desktop through an atomic workspace mailbox. Use for legacy deepseek_worker agents and manifest-selected model workers whose native task messages may not be visible to the provider.
+description: Delegate bounded Codex Desktop tasks to configured custom-model workers through a cross-platform atomic workspace mailbox. Use for manifest-selected or legacy workers when subagents need complete task handoffs, parallel execution, durable receipts, recovery, or ordered model fallback on macOS and Windows.
 ---
 
 # Custom Subagent Delegation
@@ -11,6 +11,20 @@ and are never installed as second live skills. The selected worker may use
 DeepSeek, Claude, Gemini, or another configured model.
 
 Use the native subagent channel for lifecycle and results. Use a workspace task pool for task bodies because an external model may not receive the native message or task name.
+
+## Workspace state
+
+New batches store task and run state only in `.codex-custom-subagents/` at the
+calling task's real cwd. Before starting a batch, inspect both
+`.codex-custom-subagents/` and the legacy `.deepseek-delegations/` directory.
+Never merge or rename the directories while workers may still be running.
+
+If the legacy directory contains unfinished pre-upgrade work, finish or recover
+that batch first. Place `--legacy-mailbox` before the subcommand, for example
+`claim_task.py --workspace . --legacy-mailbox recover --dry-run` or
+`delegation_runtime.py --workspace . --legacy-mailbox status --run-id <run_id>`.
+Do not put new tasks there. Old task files beginning with
+`# DeepSeek task handoff v1` remain readable only for this compatibility path.
 
 ## Optional configured model selection
 
@@ -48,12 +62,12 @@ If the selection file is absent, use the legacy DeepSeek-only procedure below.
 
 ## Create a task pool
 
-The pool always lives at the calling thread's real cwd: `claim_task.py --workspace .` resolves the pool root (`./.deepseek-delegations`) through every symlink against the process cwd, so threads sharing a logical path share one pool. The command rejects a workspace that differs from the real cwd. Use `--allow-workspace-mismatch` only for deliberate legacy compatibility. The project a task operates on is independent of the pool location and is given as an absolute path inside the task body.
+The pool always lives at the calling thread's real cwd: `claim_task.py --workspace .` resolves the pool root (`./.codex-custom-subagents`) through every symlink against the process cwd, so threads sharing a logical path share one pool. The command rejects a workspace that differs from the real cwd. Use `--allow-workspace-mismatch` only for deliberate compatibility. The project a task operates on is independent of the pool location and is given as an absolute path inside the task body.
 
 1. Split the request into independent bounded tasks. Give each task a unique ID of 1-64 lower-case letters, digits, and underscores (`[a-z0-9_]{1,64}`).
-2. Check `.deepseek-delegations/pending/` before creating a batch. Do not mix unexplained pending tasks into a new batch.
-3. Write every complete task to `.deepseek-delegations/pending/<task_id>.md` before spawning workers.
-4. Start each task file with `# DeepSeek task handoff v1`, followed by a blank line and `Task: <task_id>`. Only the header block (the first lines of the file) is validated; `Task:`-looking lines inside the task body are ignored. Include the full scope, restrictions, output, and verification.
+2. Check `.codex-custom-subagents/pending/` before creating a batch. Do not mix unexplained pending tasks into a new batch.
+3. Write every complete task to `.codex-custom-subagents/pending/<task_id>.md` before spawning workers.
+4. Start each new task file with `# Codex Custom Subagents task handoff v1`, followed by a blank line and `Task: <task_id>`. Only the header block (the first lines of the file) is validated; `Task:`-looking lines inside the task body are ignored. Include the full scope, restrictions, output, and verification.
 5. Choose the agent type once for the whole batch: when `subagent-selection.json` exists, use the agent resolved from its primary model; otherwise use the legacy `deepseek_worker`. Spawn one selected agent per pending task, up to the available agent slots. Use `fork_turns: "none"` and generic unique worker names such as `subagent_pool_1`. Never mix agent types in one batch, and do not assume a worker name determines which task it claims.
 6. Wait for every worker. Map each worker to the Task ID and claimed path reported in its result, then inspect the actual artifacts and verification.
 7. If more tasks remain than available slots, spawn the next wave only after a slot becomes free.

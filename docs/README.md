@@ -19,6 +19,22 @@ subagent. Read subagent-selection.json, use its active.agent, and verify the
 worker's artifacts and tests before accepting the result.
 ```
 
+## What the plugin enables
+
+- Delegate repository analysis, bounded implementation, tests, and review to
+  provider-backed Codex subagents while the parent task remains responsible for
+  acceptance.
+- Run the same installation and mailbox workflow on macOS and Windows 10/11.
+- Connect directly to OpenAI Responses-compatible upstreams or translate
+  Anthropic Messages through the included loopback adapter.
+- Define custom providers, models, credential references, context declarations,
+  primary selection, and ordered fallbacks in a validated JSON manifest.
+
+The built-in DeepSeek, Claude, and Gemini presets demonstrate the configuration;
+they are not the only usable services. The actual requirement is one of the two
+implemented upstream protocols. See [provider adapters](MODEL_ADAPTERS.md) for
+the precise boundary and [configuration](CONFIGURATION.md) for the manifest.
+
 ## Install and configure
 
 - [Installation, upgrade, and uninstall](INSTALLATION.md)

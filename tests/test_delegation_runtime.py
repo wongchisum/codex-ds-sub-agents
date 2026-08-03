@@ -84,6 +84,25 @@ class RuntimeStateTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    def test_run_state_uses_branded_mailbox_by_default(self) -> None:
+        started = runtime.begin(self.workspace, "current_mailbox", self.selection_path)
+
+        path = Path(started["path"])
+        self.assertEqual(".codex-custom-subagents", path.parent.parent.name)
+        self.assertFalse((self.workspace / ".deepseek-delegations").exists())
+
+    def test_legacy_run_state_requires_explicit_opt_in(self) -> None:
+        started = runtime.begin(
+            self.workspace,
+            "legacy_mailbox",
+            self.selection_path,
+            legacy_mailbox=True,
+        )
+
+        path = Path(started["path"])
+        self.assertEqual(".deepseek-delegations", path.parent.parent.name)
+        self.assertFalse((self.workspace / ".codex-custom-subagents").exists())
+
     def test_eligible_failure_switches_once_and_persists(self) -> None:
         started = runtime.begin(self.workspace, "run_1", self.selection_path)
         self.assertEqual("primary_worker", started["active"]["agent"])

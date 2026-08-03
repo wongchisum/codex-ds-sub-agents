@@ -1,5 +1,7 @@
 # Local subagent test workspaces. Never commit their contents.
 /worktree/
+/.codex-custom-subagents/
+# Pre-rename mailboxes may contain task bodies and receipts.
 /.deepseek-delegations/
 
 # Python

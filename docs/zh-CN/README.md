@@ -9,6 +9,20 @@
 - [让 Codex 帮你安装](PROMPT_INSTALLATION.md)：可以直接发送给 Codex 的安全安装 Prompt。
 - [README 使用 Prompt](../../README.zh-CN.md#在-codex-中使用)：安装后如何让 Codex 委派单个或并行任务。
 
+## 插件实际提供什么
+
+- 把仓库分析、边界明确的实现、测试和审查交给自定义 Provider 支持的 Codex
+  subagent，父任务仍负责验收。
+- 在 macOS 和 Windows 10/11 使用相同的安装与任务信箱流程。
+- 直接连接兼容 OpenAI Responses 的上游，或通过本机 adapter 转换 Anthropic
+  Messages。
+- 用经过校验的 JSON manifest 自定义 Provider、模型、凭证引用、上下文声明、
+  primary 和有序 fallback。
+
+DeepSeek、Claude 和 Gemini preset 只是配置示例，不是唯一可用服务。实际要求是
+上游实现当前两种协议之一。准确边界见[协议适配](MODEL_ADAPTERS.md)，完整字段见
+[配置文档](CONFIGURATION.md)。
+
 ## 安装与配置
 
 - [安装、升级与卸载](INSTALLATION.md)：macOS / Windows 安装结果、凭证、doctor 和卸载。

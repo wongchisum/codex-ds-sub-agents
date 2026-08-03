@@ -2,6 +2,9 @@
 
 English · [简体中文](zh-CN/CONFIGURATION.md)
 
+The same manifest and selection format is used on macOS and Windows. Replace
+`python3` with `py -3` when running these commands in Windows PowerShell.
+
 ## Built-in model/protocol presets
 
 ```bash
@@ -51,6 +54,11 @@ python3 scripts/configure.py \
 ```
 
 The manifest may contain credential references, never credential values. Supported references are `keychain`, `env`, and `env_header`. Anthropic Messages providers are converted to the Responses protocol through a local adapter; each adapter needs a unique listen port.
+
+“Custom” means provider URLs, remote model names, agent IDs, limits, credentials,
+and selection are not hard-coded. It does not mean arbitrary wire protocols can
+be loaded at runtime: `upstream_protocol` must currently be
+`openai_responses` or `anthropic_messages`.
 
 ## Non-interactive use
 

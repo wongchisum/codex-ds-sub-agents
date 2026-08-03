@@ -82,7 +82,7 @@ A run never returns to an attempted model and never exceeds `max_switches`. Auth
 Some custom providers do not receive a complete native child-task body. The Skill therefore keeps full task handoffs under the parent task's real current working directory:
 
 ```text
-.deepseek-delegations/
+.codex-custom-subagents/
 ├── pending/     # ready to claim
 ├── claimed/     # atomically claimed, with receipts
 ├── rejected/    # invalid protocol headers or tasks
@@ -90,7 +90,15 @@ Some custom providers do not receive a complete native child-task body. The Skil
 └── runs/        # active model and fallback state
 ```
 
-The parent writes every complete task before spawning a worker. A worker uses an atomic rename from `pending` to `claimed`, then writes a durable receipt. Task IDs match `[a-z0-9_]{1,64}`. The pool resolves symlinks and binds to the real process cwd.
+The parent writes every complete task before spawning a worker. New files use
+`# Codex Custom Subagents task handoff v1`; the old DeepSeek header remains
+readable for pre-upgrade tasks. A worker uses an atomic rename from `pending` to
+`claimed`, then writes a durable receipt. Task IDs match `[a-z0-9_]{1,64}`. The
+pool resolves symlinks and binds to the real process cwd.
+
+Pre-upgrade `.deepseek-delegations/` state is never mixed into a new batch.
+Explicit `--legacy-mailbox` mode exists only to finish or recover work that was
+already running before the rename.
 
 Recovery never guesses that a worker died. The parent first confirms old workers stopped, then recovers by exact task ID, claim ID, or a confirmed `--all`. Ambiguous locate operations fail instead of selecting an arbitrary claim.
 

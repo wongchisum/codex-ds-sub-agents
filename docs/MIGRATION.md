@@ -34,7 +34,23 @@ Migration is idempotent. An unmanaged old directory is reported and preserved fo
 
 New prompts and tasks must use `$codex-custom-subagents`; no active alias is installed for either legacy name.
 
-The names `.deepseek-delegations/`, `# DeepSeek task handoff v1`, and `.codex-deepseek-manifest.json` intentionally remain unchanged. They identify the existing mailbox protocol and old ownership records. Renaming them would break in-flight tasks or safe uninstall detection.
+New batches use `.codex-custom-subagents/` and the header
+`# Codex Custom Subagents task handoff v1`. The old
+`.deepseek-delegations/` directory is not moved automatically: active file
+locks and absolute paths in receipts make an automatic rename unsafe.
+
+Before starting a new batch, inspect both directories. If the old directory
+contains unfinished work, stop all old workers and add `--legacy-mailbox` to
+the `claim_task.py` and `delegation_runtime.py` commands needed to finish or
+recover that batch. The flag must precede the subcommand, for example
+`claim_task.py --workspace . --legacy-mailbox recover --dry-run`. Do not add new
+tasks to the legacy directory and do not merge the two mailboxes. The old
+`# DeepSeek task handoff v1` header remains readable for this explicit
+compatibility mode.
+
+Keep both mailbox paths in `.gitignore`; task bodies may contain private
+repository context. `.codex-deepseek-manifest.json` also remains unchanged
+because it is an ownership marker used for safe removal of old Skill installs.
 
 ## Start a new Codex task
 

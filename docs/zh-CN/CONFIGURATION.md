@@ -2,6 +2,9 @@
 
 # 模型与 fallback 配置
 
+macOS 和 Windows 使用相同的 manifest 与 selection 格式。在 Windows
+PowerShell 运行本文命令时，把 `python3` 换成 `py -3`。
+
 ## 内置模型-协议选择
 
 ```bash
@@ -50,7 +53,13 @@ python3 scripts/configure.py \
   --name my-team
 ```
 
-manifest 只能保存凭证引用，不能保存 API Key。支持 `keychain` 和 `env` 引用。Anthropic Messages Provider 会经本机 adapter 转成 Codex 当前使用的 Responses 协议；多个 adapter 必须使用不同监听端口。
+manifest 只能保存凭证引用，不能保存 API Key。支持 `keychain`、`env` 和
+`env_header`。Anthropic Messages Provider 会经本机 adapter 转成 Codex 当前使用的
+Responses 协议；多个 adapter 必须使用不同监听端口。
+
+“自定义”指 Provider URL、远端模型名、agent ID、限制、凭证和 selection 不写死，
+不代表可以在运行时加载任意协议。当前 `upstream_protocol` 只能是
+`openai_responses` 或 `anthropic_messages`。
 
 ## 旧入口
 

@@ -1,7 +1,7 @@
 {
   "name": "codex-custom-subagents",
   "version": "0.1.0",
-  "description": "Use custom model providers as Codex Desktop subagents on macOS and Windows.",
+  "description": "Use OpenAI Responses or Anthropic Messages providers as configurable Codex Desktop subagents on macOS and Windows.",
   "author": {
     "name": "wongchisum",
     "url": "https://github.com/wongchisum"
@@ -11,6 +11,7 @@
   "keywords": [
     "subagents",
     "multi-model",
+    "openai",
     "anthropic",
     "gemini",
     "deepseek"
@@ -19,13 +20,14 @@
   "interface": {
     "displayName": "Codex Custom Subagents",
     "shortDescription": "Run Codex tasks with custom subagents.",
-    "longDescription": "Configure custom providers and let Codex Desktop delegate tasks to their subagents across macOS and Windows.",
+    "longDescription": "Configure custom providers, models, primary/fallback routing, and OpenAI Responses or Anthropic Messages protocols, then let Codex Desktop delegate repository tasks to those subagents on macOS and Windows.",
     "developerName": "wongchisum",
     "category": "Productivity",
     "capabilities": [
-      "Multi-model subagents",
-      "Protocol adapters",
-      "Fallback routing"
+      "OpenAI Responses providers",
+      "Anthropic Messages adapter",
+      "Custom provider manifests",
+      "Primary and fallback routing"
     ],
     "websiteURL": "https://github.com/wongchisum/codex-custom-subagents",
     "defaultPrompt": [

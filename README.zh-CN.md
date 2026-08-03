@@ -55,16 +55,93 @@ https://github.com/wongchisum/codex-custom-subagents
 整批只使用一个 active model，为每个 worker 指定有限职责，并在接受结果前逐项验证。
 ```
 
-目标仓库应忽略持久任务信箱：
+## 它实际做什么
+
+这个插件会把自定义 Provider 安装成 Codex Desktop 可调用的 agent。它不替代
+Codex，也不是一个通用聊天界面。父任务负责拆分和验收，自定义 subagent 在同一
+工作区内使用 Codex 提供的文件、命令和补丁工具完成具体工作。
+
+```text
+用户任务
+  → 父 Codex 读取配置并选择 primary agent
+  → 把有限职责的任务写入 .codex-custom-subagents/pending/
+  → 多个自定义 subagent 原子领取不同任务
+  → worker 分析或修改文件，并运行命令和测试
+  → 父 Codex 检查产物后决定是否接受
+  → 符合条件的传输故障可让整批切换到 fallback agent
+```
+
+实际用途包括：
+
+- 把仓库审查拆成架构、安全、测试和文档等相互独立的任务。
+- 把长代码调查或一个边界明确的实现交给指定的自定义模型。
+- 并行处理多个修复，父任务统一检查每份 diff 和测试结果。
+- 为 primary 和有序 fallback 配置不同 Provider，任务文件中不保存 API Key。
+
+目标仓库应同时忽略当前信箱和旧版升级路径。任务正文可能包含私有仓库信息：
 
 ```gitignore
+/.codex-custom-subagents/
+# 从旧版本升级时保留这一行。
 /.deepseek-delegations/
 ```
 
-## 特性
+新批次不会再写入旧目录。如果旧目录还有升级前的未完成任务，使用显式
+`--legacy-mailbox` 模式完成该批次；不得改名或合并仍有 worker 使用的信箱。详见
+[迁移文档](docs/zh-CN/MIGRATION.md)。
 
-- 自定义 Provider URL、远端模型名、上下文声明和输出上限。
-- 直接接入 OpenAI Responses Provider；通过本机 adapter 接入 Anthropic Messages Provider。
+## 跨平台、协议与自定义配置
+
+| 范围 | 已核实支持 | 实际含义 |
+| --- | --- | --- |
+| Codex Desktop 主机 | macOS、Windows 10/11 | 安装、凭证读取、服务管理、文件锁、任务领取、恢复和诊断都支持这两个平台。目前不宣称支持 Linux 主机。 |
+| Codex 侧协议 | Responses | 生成的 Provider 都使用 Codex 当前需要的 Responses 协议。 |
+| OpenAI 类上游 | `openai_responses` | Codex 直接请求兼容 OpenAI Responses 的 Provider URL；不代表支持 Chat Completions。 |
+| Anthropic 上游 | `anthropic_messages` | 本机 loopback adapter 在 Codex Responses 与 Anthropic Messages 之间转换请求、工具调用、流式事件、响应和 usage。 |
+| 自定义配置 | JSON manifest schema v2 | 可定义 Provider URL、远端模型名、协议、凭证引用、上下文/输出声明、agent 名、一个 primary 和有序 fallback。 |
+
+这里的“跨端”指同一套插件可以安装并运行在 macOS 和 Windows Codex Desktop，
+不代表两个设备之间自动同步同一个进行中的任务。
+
+内置 preset 只是示例，不是封闭的 Provider 列表。自定义 manifest 可以连接实现
+上述任一上游协议的其他服务。manifest 只保存凭证引用；凭证值留在 macOS
+Keychain、Windows Credential Manager 或指定环境变量中。
+
+最小结构：
+
+```json
+{
+  "schema_version": 2,
+  "providers": [
+    {
+      "id": "my_provider",
+      "name": "My Provider",
+      "base_url": "https://provider.example/api",
+      "protocol": "responses",
+      "upstream_protocol": "openai_responses",
+      "auth": { "type": "env", "variable": "MY_PROVIDER_API_KEY" }
+    }
+  ],
+  "models": [
+    {
+      "id": "my_model",
+      "provider": "my_provider",
+      "remote_model": "model-name",
+      "agent": "my_model_worker",
+      "context_window": 128000,
+      "max_context_window": 128000,
+      "effective_context_window_percent": 95
+    }
+  ],
+  "selection": { "primary": "my_model", "fallbacks": [] }
+}
+```
+
+完整字段见[配置文档](docs/zh-CN/CONFIGURATION.md)，协议转换边界见
+[Provider 与协议适配](docs/zh-CN/MODEL_ADAPTERS.md)。
+
+## 其他特性
+
 - 每批只使用一个 primary 模型，合格的传输故障可按顺序切换 fallback。
 - 支持 macOS Keychain、Windows Credential Manager 和环境变量凭证引用。
 - 支持 macOS LaunchAgent 和 Windows Task Scheduler 服务管理。
@@ -123,7 +200,7 @@ python3 scripts/configure.py \
 - [Windows 真机清单](docs/zh-CN/WINDOWS_TESTING.md)
 - [故障排查](docs/zh-CN/TROUBLESHOOTING.md)
 
-`doctor.py` 只验证本机安装状态、凭证引用、Codex 严格配置和 adapter 健康，不调用真实模型，也不检查计费。Windows 分支已有自动化覆盖，但发布前仍需执行文档中的 Windows 10/11 真机测试。
+`doctor.py` 只验证本机安装状态、凭证引用、Codex 严格配置和 adapter 健康，不调用真实模型，也不检查计费。CI 同时运行 macOS 和 Windows；维护者也在 2026-08-03 确认 PR #1 的完整 Windows 真机清单通过。后续版本仍需重新执行真机清单。
 
 本项目是第三方集成，不是 OpenAI、Anthropic、Google 或 DeepSeek 的官方产品。
 

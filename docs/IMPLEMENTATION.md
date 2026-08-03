@@ -17,7 +17,10 @@ English · [简体中文](zh-CN/IMPLEMENTATION.md)
 
 In some Codex Desktop and provider/protocol combinations, the native parent-to-child message does not reliably carry the full subtask body. A worker may otherwise receive an empty task or only an encrypted block.
 
-The parent writes the complete handoff before spawning. The protocol header remains `# DeepSeek task handoff v1` for compatibility; it does not require a DeepSeek model.
+The parent writes the complete handoff before spawning. New files use
+`# Codex Custom Subagents task handoff v1` under
+`.codex-custom-subagents/`. The old DeepSeek header and mailbox are accepted
+only when `--legacy-mailbox` is explicitly used to finish pre-upgrade work.
 
 ```text
 validate real cwd

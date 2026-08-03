@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -19,6 +21,10 @@ except ModuleNotFoundError:  # Python < 3.11
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+from model_manifest import load_manifest  # noqa: E402
+
+
 MINIMAL_CLIENT_VERSION = "0.146.0"
 TOML_REASON = "tomllib requires Python 3.11+; CI runs 3.11"
 BILINGUAL_DOCS = (
@@ -130,16 +136,47 @@ class ReleaseAssetTests(unittest.TestCase):
         self.assertTrue(screenshot.is_file())
         self.assertEqual(b"\x89PNG\r\n\x1a\n", screenshot.read_bytes()[:8])
 
-    def test_readmes_lead_with_codex_prompts_before_features(self) -> None:
+    def test_readmes_lead_with_prompts_and_state_verified_capabilities(self) -> None:
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
         readme_zh = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
         self.assertIn("helps Codex Desktop use custom model providers as subagents", readme)
-        self.assertLess(readme.index("## Ask Codex to install it"), readme.index("## Features"))
-        self.assertLess(readme.index("## Use it in Codex"), readme.index("## Features"))
+        capabilities = readme.index("## What it actually does")
+        self.assertLess(readme.index("## Ask Codex to install it"), capabilities)
+        self.assertLess(readme.index("## Use it in Codex"), capabilities)
+        self.assertIn("macOS and Windows 10/11", readme)
+        self.assertIn("It does not mean live task synchronization", readme)
+        self.assertIn("`openai_responses`", readme)
+        self.assertIn("`anthropic_messages`", readme)
+        self.assertIn("JSON manifest schema v2", readme)
+        self.assertIn("/.codex-custom-subagents/", readme)
         self.assertIn("帮助 Codex Desktop 使用自定义模型 Provider 作为 subagent", readme_zh)
-        self.assertLess(readme_zh.index("## 让 Codex 安装"), readme_zh.index("## 特性"))
-        self.assertLess(readme_zh.index("## 在 Codex 中使用"), readme_zh.index("## 特性"))
+        capabilities_zh = readme_zh.index("## 它实际做什么")
+        self.assertLess(readme_zh.index("## 让 Codex 安装"), capabilities_zh)
+        self.assertLess(readme_zh.index("## 在 Codex 中使用"), capabilities_zh)
+        self.assertIn("macOS、Windows 10/11", readme_zh)
+        self.assertIn("`openai_responses`", readme_zh)
+        self.assertIn("`anthropic_messages`", readme_zh)
+        self.assertIn("JSON manifest schema v2", readme_zh)
+        self.assertIn("/.codex-custom-subagents/", readme_zh)
+
+    def test_readme_custom_manifest_examples_match_and_validate(self) -> None:
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        readme_zh = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+        english = re.search(r"Minimal shape:\n\n```json\n(.*?)\n```", readme, re.DOTALL)
+        chinese = re.search(r"最小结构：\n\n```json\n(.*?)\n```", readme_zh, re.DOTALL)
+        self.assertIsNotNone(english)
+        self.assertIsNotNone(chinese)
+        english_manifest = json.loads(english.group(1))
+        self.assertEqual(english_manifest, json.loads(chinese.group(1)))
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "readme-manifest.json"
+            path.write_text(json.dumps(english_manifest), encoding="utf-8")
+            manifest = load_manifest(path)
+
+        self.assertEqual("my_model", manifest.selection.primary.id)
+        self.assertEqual("openai_responses", manifest.providers["my_provider"].upstream_protocol)
 
     def test_documentation_defaults_to_english_with_chinese_mirrors(self) -> None:
         for name in BILINGUAL_DOCS:
@@ -181,9 +218,10 @@ class ReleaseAssetTests(unittest.TestCase):
             self.assertIn("Codex Custom Subagents", readme)
             self.assertNotIn("github.com/wongchisum/codex-ds-sub-agents", readme)
 
-    def test_worktree_and_delegations_are_ignored_forever(self) -> None:
+    def test_worktree_and_mailboxes_are_ignored_forever(self) -> None:
         gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertRegex(gitignore, r"(?m)^/worktree/$")
+        self.assertRegex(gitignore, r"(?m)^/\.codex-custom-subagents/$")
         self.assertRegex(gitignore, r"(?m)^/\.deepseek-delegations/$")
 
     def test_uninstall_script_exists_and_is_compilable(self) -> None:

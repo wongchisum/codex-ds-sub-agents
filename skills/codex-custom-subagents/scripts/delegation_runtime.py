@@ -29,6 +29,8 @@ KNOWN_FAILURES = ELIGIBLE_FAILURES | frozenset(
     {"auth", "invalid_request", "model_not_found", "task_failure", "unknown"}
 )
 AUTH_PREFLIGHT_TIMEOUT_SECONDS = 5.0
+MAILBOX_NAME = ".codex-custom-subagents"
+LEGACY_MAILBOX_NAME = ".deepseek-delegations"
 
 
 class RuntimeErrorCode(str, enum.Enum):
@@ -133,14 +135,15 @@ def classify_failure(
     return "unknown"
 
 
-def pool_root(workspace: Path) -> Path:
-    return workspace.resolve() / ".deepseek-delegations" / "runs"
+def pool_root(workspace: Path, *, legacy_mailbox: bool = False) -> Path:
+    mailbox_name = LEGACY_MAILBOX_NAME if legacy_mailbox else MAILBOX_NAME
+    return workspace.resolve() / mailbox_name / "runs"
 
 
-def state_path(workspace: Path, run_id: str) -> Path:
+def state_path(workspace: Path, run_id: str, *, legacy_mailbox: bool = False) -> Path:
     if not RUN_ID_PATTERN.fullmatch(run_id):
         raise RuntimeFailure(RuntimeErrorCode.INVALID_INPUT, "run_id must match [a-z0-9_]{1,64}")
-    return pool_root(workspace) / f"{run_id}.json"
+    return pool_root(workspace, legacy_mailbox=legacy_mailbox) / f"{run_id}.json"
 
 
 @contextmanager
@@ -263,8 +266,14 @@ def _auth_preflight(selection_path: Path, model_id: str, model: dict[str, Any]) 
     return {**auth, "status": "passed"}
 
 
-def begin(workspace: Path, run_id: str, selection_path: Path) -> dict[str, Any]:
-    path = state_path(workspace, run_id)
+def begin(
+    workspace: Path,
+    run_id: str,
+    selection_path: Path,
+    *,
+    legacy_mailbox: bool = False,
+) -> dict[str, Any]:
+    path = state_path(workspace, run_id, legacy_mailbox=legacy_mailbox)
     primary, fallbacks, max_switches, models = validate_selection(load_json(selection_path, "selection"))
     with run_lock(path):
         if path.exists():
@@ -298,8 +307,14 @@ def begin(workspace: Path, run_id: str, selection_path: Path) -> dict[str, Any]:
     }
 
 
-def record_failure(workspace: Path, run_id: str, failure: dict[str, Any]) -> dict[str, Any]:
-    path = state_path(workspace, run_id)
+def record_failure(
+    workspace: Path,
+    run_id: str,
+    failure: dict[str, Any],
+    *,
+    legacy_mailbox: bool = False,
+) -> dict[str, Any]:
+    path = state_path(workspace, run_id, legacy_mailbox=legacy_mailbox)
     message = failure.get("message")
     if message is not None and (
         not isinstance(message, str) or len(message) > MAX_FAILURE_MESSAGE_CHARS
@@ -345,15 +360,21 @@ def record_failure(workspace: Path, run_id: str, failure: dict[str, Any]) -> dic
     return result
 
 
-def show(workspace: Path, run_id: str) -> dict[str, Any]:
-    path = state_path(workspace, run_id)
+def show(workspace: Path, run_id: str, *, legacy_mailbox: bool = False) -> dict[str, Any]:
+    path = state_path(workspace, run_id, legacy_mailbox=legacy_mailbox)
     if not path.is_file():
         raise RuntimeFailure(RuntimeErrorCode.NOT_FOUND, f"run not found: {run_id}")
     return load_json(path, "run state")
 
 
-def finish(workspace: Path, run_id: str, outcome: str) -> dict[str, Any]:
-    path = state_path(workspace, run_id)
+def finish(
+    workspace: Path,
+    run_id: str,
+    outcome: str,
+    *,
+    legacy_mailbox: bool = False,
+) -> dict[str, Any]:
+    path = state_path(workspace, run_id, legacy_mailbox=legacy_mailbox)
     with run_lock(path):
         if not path.is_file():
             raise RuntimeFailure(RuntimeErrorCode.NOT_FOUND, f"run not found: {run_id}")
@@ -372,6 +393,11 @@ def finish(workspace: Path, run_id: str, outcome: str) -> dict[str, Any]:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", default=".")
+    parser.add_argument(
+        "--legacy-mailbox",
+        action="store_true",
+        help="use legacy .deepseek-delegations run state only for pre-upgrade work",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     start = commands.add_parser("begin")
     start.add_argument("--run-id", required=True)
@@ -395,16 +421,26 @@ def main(argv: list[str] | None = None) -> int:
     workspace = Path(args.workspace).expanduser().resolve()
     try:
         if args.command == "begin":
-            result = begin(workspace, args.run_id, args.selection.expanduser().resolve())
+            result = begin(
+                workspace,
+                args.run_id,
+                args.selection.expanduser().resolve(),
+                legacy_mailbox=args.legacy_mailbox,
+            )
         elif args.command == "record-failure":
             result = record_failure(workspace, args.run_id, {
                 "category": args.category, "http_status": args.http_status,
                 "error_code": args.error_code, "message": args.message,
-            })
+            }, legacy_mailbox=args.legacy_mailbox)
         elif args.command == "status":
-            result = show(workspace, args.run_id)
+            result = show(workspace, args.run_id, legacy_mailbox=args.legacy_mailbox)
         else:
-            result = finish(workspace, args.run_id, args.outcome)
+            result = finish(
+                workspace,
+                args.run_id,
+                args.outcome,
+                legacy_mailbox=args.legacy_mailbox,
+            )
     except RuntimeFailure as error:
         emit({"status": "error", "code": error.code.value, "message": str(error)}, error=True)
         return 2

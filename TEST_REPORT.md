@@ -35,6 +35,10 @@ test output.
   passed on 2026-08-03, and CI now covers both macOS and Windows runners.
 - Configure phases, adapter audit/output tails, mailbox receipts, and runtime
   state can be exported in a bounded redacted diagnostic bundle.
+- New task and fallback state is stored in `.codex-custom-subagents/`. The old
+  `.deepseek-delegations/` path is available only through explicit
+  `--legacy-mailbox` mode to finish pre-upgrade work; tests verify that the two
+  pools are not mixed.
 - Skill packaging ignores interpreter/OS caches and copies valid binary assets
   without decoding them as text, so repeated installs are Python-version safe.
 
@@ -48,7 +52,7 @@ test output.
 | Custom install and doctor | PASS | isolated Codex home, strict config loaded |
 | Windows platform simulation | PASS | win32 import, Task Scheduler XML/lifecycle mocks, `msvcrt` lock dispatch, dynamic Python/path rendering |
 | Credential and diagnostics | PASS | native-store boundary, configure JSONL redaction, bounded diagnostic zip with task/config exclusions |
-| Full automated suite | PASS | Python 3.13 ran 305 tests; Python 3.9 ran 305 tests with 3 TOML checks skipped |
+| Full automated suite | PASS | Python 3.13 ran 311 tests; Python 3.9 ran 311 tests with 3 TOML checks skipped |
 | Python compilation | PASS | bytecode cache redirected to `/private/tmp` |
 
 The plugin manifest and `$codex-custom-subagents` Skill were also validated with
@@ -154,7 +158,7 @@ The original Gemini result above applies to
 - An isolated generated provider, agent, and model catalog passed doctor,
   Keychain lookup, adapter health, wire API, and Codex strict-config checks.
 - A real Codex turn called `/bin/zsh -lc pwd`; the command exited 0 and Gemini
-  returned `GEMINI_TOOL_OK /Users/a1234/Documents/codex-deepseek-subagents`.
+  returned `GEMINI_TOOL_OK` followed by the checkout's absolute path.
 - The test credential was read from macOS Keychain and was not written to the
   manifest, command arguments, report, or model output.
 - A CLI-only native spawn attempt was inconclusive because that isolated main
