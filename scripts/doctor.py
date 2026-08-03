@@ -39,6 +39,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-home", type=Path, default=resolve_codex_home())
     parser.add_argument("--skip-keychain", action="store_true")
     parser.add_argument("--skip-adapter-health", action="store_true")
+    parser.add_argument(
+        "--skip-codex",
+        action="store_true",
+        help="skip Codex executable and strict-config checks (test environments only)",
+    )
     parser.add_argument("--manifest", type=Path, default=None)
     return parser.parse_args()
 
@@ -185,12 +190,13 @@ def check_custom_install(args: argparse.Namespace, codex_home: Path) -> int:
                 ok, detail = False, str(error)
             checks.append(report(ok, "credential store", detail))
 
-    bundled_codex = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
-    codex = shutil.which("codex") or (str(bundled_codex) if bundled_codex.is_file() else None)
-    checks.append(report(codex is not None, "codex", codex or "not found"))
-    if codex is not None:
-        returncode, detail = _run_codex(codex, codex_home, CODEX_TIMEOUT)
-        checks.append(report(returncode == 0, "strict config", detail or "config loads cleanly"))
+    if not args.skip_codex:
+        bundled_codex = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+        codex = shutil.which("codex") or (str(bundled_codex) if bundled_codex.is_file() else None)
+        checks.append(report(codex is not None, "codex", codex or "not found"))
+        if codex is not None:
+            returncode, detail = _run_codex(codex, codex_home, CODEX_TIMEOUT)
+            checks.append(report(returncode == 0, "strict config", detail or "config loads cleanly"))
     return 0 if all(checks) else 1
 
 
@@ -285,12 +291,13 @@ def main() -> int:
         else:
             checks.append(report(False, "keychain", "macOS security command not found"))
 
-    bundled_codex = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
-    codex = shutil.which("codex") or (str(bundled_codex) if bundled_codex.is_file() else None)
-    checks.append(report(codex is not None, "codex", codex or "not found"))
-    if codex is not None:
-        ok, detail = check_strict_config(codex, codex_home, PROJECT_ROOT)
-        checks.append(report(ok, "strict config", detail))
+    if not args.skip_codex:
+        bundled_codex = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+        codex = shutil.which("codex") or (str(bundled_codex) if bundled_codex.is_file() else None)
+        checks.append(report(codex is not None, "codex", codex or "not found"))
+        if codex is not None:
+            ok, detail = check_strict_config(codex, codex_home, PROJECT_ROOT)
+            checks.append(report(ok, "strict config", detail))
     return 0 if all(checks) else 1
 
 

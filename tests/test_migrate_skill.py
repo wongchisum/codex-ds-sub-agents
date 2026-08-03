@@ -75,7 +75,7 @@ class MigrateSkillTests(unittest.TestCase):
             self.assertTrue((codex_home / "skills" / NEW_SKILL / "SKILL.md").is_file())
             agent = (codex_home / "agents" / "deepseek-worker.toml").read_text(encoding="utf-8")
             expected_claim_path = (
-                install.toml_path_escape(str(codex_home))
+                install.toml_path_escape(str(codex_home.resolve()))
                 + f"/skills/{NEW_SKILL}/scripts/claim_task.py"
             )
             self.assertIn(expected_claim_path, agent)

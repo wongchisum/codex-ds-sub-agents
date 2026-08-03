@@ -36,10 +36,11 @@ class DoctorUnitTests(unittest.TestCase):
         def read(self, size: int) -> bytes:
             return self.body[:size]
 
-    def test_adapter_health_check_is_enabled_by_default(self) -> None:
+    def test_optional_checks_are_enabled_by_default(self) -> None:
         with mock.patch.object(sys, "argv", ["doctor"]):
             args = doctor.parse_args()
         self.assertFalse(args.skip_adapter_health)
+        self.assertFalse(args.skip_codex)
 
     def test_keychain_check_times_out(self) -> None:
         with mock.patch.object(
@@ -122,6 +123,7 @@ class DoctorUnitTests(unittest.TestCase):
             manifest=PROJECT_ROOT / "config" / "gemini-anthropic.example.json",
             skip_keychain=True,
             skip_adapter_health=False,
+            skip_codex=False,
         )
         with mock.patch.object(
             doctor,
@@ -140,19 +142,22 @@ class DoctorUnitTests(unittest.TestCase):
             self.FINGERPRINT,
         )
 
-    def test_custom_install_can_explicitly_skip_adapter_health(self) -> None:
+    def test_custom_install_can_explicitly_skip_optional_checks(self) -> None:
         args = SimpleNamespace(
             manifest=PROJECT_ROOT / "config" / "gemini-anthropic.example.json",
             skip_keychain=True,
             skip_adapter_health=True,
+            skip_codex=True,
         )
         with mock.patch.object(doctor, "check_adapter_health") as health, mock.patch.object(
-            doctor.shutil, "which", return_value=None
-        ), mock.patch.object(
-            doctor, "_run_codex", return_value=(0, "ok")
-        ), redirect_stdout(StringIO()):
+            doctor.shutil, "which"
+        ) as codex_lookup, mock.patch.object(doctor, "_run_codex") as run_codex, redirect_stdout(
+            StringIO()
+        ):
             doctor.check_custom_install(args, self._temp_home())
         health.assert_not_called()
+        codex_lookup.assert_not_called()
+        run_codex.assert_not_called()
 
     def test_strict_config_failure_classified_as_user_config(self) -> None:
         codex_home = self._temp_home()

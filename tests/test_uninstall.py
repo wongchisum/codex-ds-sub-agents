@@ -199,6 +199,7 @@ class UninstallTests(unittest.TestCase):
                     str(multi_manifest),
                     "--skip-keychain",
                     "--skip-adapter-health",
+                    "--skip-codex",
                 ],
                 text=True,
                 capture_output=True,

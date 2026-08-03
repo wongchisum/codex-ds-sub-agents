@@ -361,6 +361,7 @@ class InstallTests(unittest.TestCase):
                     str(manifest),
                     "--skip-keychain",
                     "--skip-adapter-health",
+                    "--skip-codex",
                 ],
                 text=True,
                 capture_output=True,
@@ -395,6 +396,7 @@ class InstallTests(unittest.TestCase):
                     str(manifest),
                     "--skip-keychain",
                     "--skip-adapter-health",
+                    "--skip-codex",
                 ],
                 text=True,
                 capture_output=True,
@@ -414,7 +416,7 @@ class InstallTests(unittest.TestCase):
             agent = (codex_home / "agents" / "deepseek-worker.toml").read_text(encoding="utf-8")
             config = (codex_home / "config.toml").read_text(encoding="utf-8")
             self.assertNotIn("__CODEX_HOME__", agent)
-            self.assertIn(install.toml_path_escape(str(codex_home)), agent)
+            self.assertIn(install.toml_path_escape(str(codex_home.resolve())), agent)
             real_headers = [
                 line for line in config.splitlines() if line.strip() == "[model_providers.deepseek]"
             ]
@@ -577,11 +579,19 @@ class InstallTests(unittest.TestCase):
             install_result = run_install(codex_home)
             self.assertEqual(0, install_result.returncode, install_result.stderr)
             result = subprocess.run(
-                [sys.executable, str(DOCTOR_SCRIPT), "--codex-home", str(codex_home), "--skip-keychain"],
+                [
+                    sys.executable,
+                    str(DOCTOR_SCRIPT),
+                    "--codex-home",
+                    str(codex_home),
+                    "--skip-keychain",
+                    "--skip-codex",
+                ],
                 text=True,
                 capture_output=True,
                 check=False,
             )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             for line in (
                 "PASS  agent",
                 "PASS  model",
@@ -602,7 +612,14 @@ class InstallTests(unittest.TestCase):
                 "# [model_providers.deepseek]\n# [model_providers.deepseek.auth]\n", encoding="utf-8"
             )
             result = subprocess.run(
-                [sys.executable, str(DOCTOR_SCRIPT), "--codex-home", str(codex_home), "--skip-keychain"],
+                [
+                    sys.executable,
+                    str(DOCTOR_SCRIPT),
+                    "--codex-home",
+                    str(codex_home),
+                    "--skip-keychain",
+                    "--skip-codex",
+                ],
                 text=True,
                 capture_output=True,
                 check=False,
