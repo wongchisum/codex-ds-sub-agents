@@ -2,7 +2,11 @@
 
 # Windows 真机兼容测试
 
-当前仓库已实现 Windows Credential Manager、Task Scheduler 服务、跨平台文件锁和动态 Python 路径。自动化测试在 macOS 上模拟 Windows 分支，不能替代 Windows 10/11 真机验收。
+当前仓库已实现 Windows Credential Manager、Task Scheduler 服务、跨平台文件锁和动态 Python 路径。CI 会在 `macos-latest` 和 `windows-latest` 分别运行自动化测试，但不能替代下面的 Codex Desktop 真机流程。
+
+## 验证状态
+
+维护者已在 PR #1 上完成 Windows 真机流程，并于 2026-08-03 确认通过。后续 Windows 发布仍须重新执行本清单并记录各自环境，禁止提交凭证值。
 
 ## 环境记录
 
@@ -48,7 +52,7 @@ py -3 -m unittest tests.test_credential_store tests.test_configure tests.test_di
 每次安装或切换 agent 后新建 Codex 任务：
 
 1. 读取 `subagent-selection.json`，核对 primary、agent、provider 和 remote model。
-2. 用 `$codex-custom-subagent` 创建一个只读任务，确认 atomic claim 回执含正确 agent/model/provider。
+2. 用 `$codex-custom-subagents` 创建一个只读任务，确认 atomic claim 回执含正确 agent/model/provider。
 3. 再执行一个会修改临时测试文件并运行测试的工具循环，父任务验收真实产物。
 4. 让 worker 完成 claim，确认 receipt 为 `completed`、exit code 为 0。
 5. 重启 Codex Desktop 或重新登录 Windows，确认 Task Scheduler 能重新启动 adapter。
@@ -75,4 +79,4 @@ py -3 scripts\diagnostics.py --run windows_case_01 --out diagnostics --format zi
 
 ## 验收结论
 
-只有安装、重启、真实 worker 工具循环、fallback、卸载和诊断包检查全部完成，才能把 Windows 标记为“真机验证通过”。在此之前应写“Windows 实现完成，真机未验证”，不能写“支持已验证”。
+只有安装、重启、真实 worker 工具循环、fallback、卸载和诊断包检查全部完成，才能把 Windows 标记为“真机验证通过”。2026-08-03 的 PR #1 验收已满足该发布门槛；后续版本需要新的真机记录。

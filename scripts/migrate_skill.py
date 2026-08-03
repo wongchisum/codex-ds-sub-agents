@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate managed predecessor skills to `codex-custom-subagent`.
+"""Migrate managed predecessor skills to `codex-custom-subagents`.
 
 Detects an old managed install (recognized by its own
 `.codex-deepseek-manifest.json` ownership record), removes only files whose
@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Migrate managed deepseek-delegation or codex-custom-agents skill installs "
-            "to codex-custom-subagent, then install the current plugin resources."
+            "to codex-custom-subagents, then install the current plugin resources."
         )
     )
     parser.add_argument("--codex-home", type=Path, default=resolve_codex_home())

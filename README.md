@@ -4,7 +4,7 @@ English · [简体中文](README.zh-CN.md)
 
 [Documentation](docs/README.md) · [Installation](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 
-`codex-custom-subagents` helps Codex Desktop use custom model providers as subagents to complete tasks. It supports macOS and Windows, keeps credentials outside prompts and manifests, and lets Codex delegate work through the `$codex-custom-subagent` skill.
+`codex-custom-subagents` helps Codex Desktop use custom model providers as subagents to complete tasks. It supports macOS and Windows, keeps credentials outside prompts and manifests, and lets Codex delegate work through the `$codex-custom-subagents` skill.
 
 ![Custom subagent tasks in Codex Desktop](assets/codex-custom-subagents.png)
 
@@ -35,7 +35,7 @@ https://github.com/wongchisum/codex-custom-subagents
    doctor. Do not claim success unless doctor passes.
 8. Tell me to close this Codex task and start a new task because an open task
    cannot hot-load newly installed agent types.
-9. In the new task, use $codex-custom-subagent. Do not use either legacy skill
+9. In the new task, use $codex-custom-subagents. Do not use either legacy skill
    name.
 10. Do not print, copy, commit, or upload credential values.
 ```
@@ -47,7 +47,7 @@ The standalone prompt is also available in [docs/PROMPT_INSTALLATION.md](docs/PR
 After installation, start a **new Codex task** and use a prompt like this:
 
 ```text
-Use $codex-custom-subagent to delegate the following work to the configured
+Use $codex-custom-subagents to delegate the following work to the configured
 custom subagent:
 
 <describe the task>
@@ -59,7 +59,7 @@ worker's artifacts and tests, and report the accepted result.
 For independent parallel work:
 
 ```text
-Use $codex-custom-subagent to split this work into independent subagent tasks.
+Use $codex-custom-subagents to split this work into independent subagent tasks.
 Use one active model for the whole batch, give each worker a bounded scope, and
 verify every result before accepting it.
 ```
@@ -78,7 +78,7 @@ The target repository should ignore the durable task mailbox:
 - macOS Keychain, Windows Credential Manager, and environment-variable credential references.
 - macOS LaunchAgent and Windows Task Scheduler service management.
 - Atomic task claiming, durable receipts, recovery, redacted diagnostics, and safe uninstall ownership.
-- Managed migration from `$deepseek-delegation`, `$codex-custom-agents`, and `$codex-custom-subagents` to `$codex-custom-subagent`.
+- Managed migration from `$deepseek-delegation` and `$codex-custom-agents` to `$codex-custom-subagents`.
 
 ## Manual quick start
 
@@ -135,3 +135,7 @@ If `configure.py` exits with code 3, run the printed credential command locally 
 `doctor.py` validates local installation state, credential references, strict Codex configuration, and adapter health. It does not call a real model or validate billing. Windows branches have automated coverage, but release claims still require the documented Windows 10/11 real-machine run.
 
 This is a third-party integration, not an official OpenAI, Anthropic, Google, or DeepSeek product.
+
+## Links
+
+[Linux Do](https://linux.do/)

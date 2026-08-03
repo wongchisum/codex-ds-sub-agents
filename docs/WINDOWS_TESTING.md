@@ -4,8 +4,14 @@ English · [简体中文](zh-CN/WINDOWS_TESTING.md)
 
 The repository implements Windows Credential Manager, Task Scheduler service
 management, cross-platform file locking, and dynamic Python interpreter paths.
-Automated tests exercise Windows branches on macOS, but they do not replace a
-real Windows 10 or 11 run.
+CI runs the automated suite on both `macos-latest` and `windows-latest`, but it
+does not replace the Codex Desktop real-machine flow below.
+
+## Verification status
+
+The maintainer completed the Windows real-machine flow against PR #1 and
+reported it passing on 2026-08-03. Future Windows releases must repeat this
+checklist and record their own environment without committing credential values.
 
 ## Record the environment
 
@@ -59,7 +65,7 @@ Start a new Codex task after each agent installation or switch:
 
 1. Read `subagent-selection.json` and verify the primary, agent, provider, and
    remote model.
-2. Use `$codex-custom-subagent` for a read-only task and confirm the atomic
+2. Use `$codex-custom-subagents` for a read-only task and confirm the atomic
    claim receipt contains the expected agent, model, and provider.
 3. Run a second tool loop that edits a temporary test file and executes tests;
    the parent must inspect the real artifact.
@@ -92,5 +98,5 @@ Do not upload it if plaintext credentials are present.
 ## Acceptance statement
 
 Mark Windows as verified only after installation, restart, a real worker tool
-loop, fallback, uninstall, and diagnostic inspection all pass. Before that,
-state: "Windows implementation complete; real-machine verification pending."
+loop, fallback, uninstall, and diagnostic inspection all pass. The 2026-08-03
+PR #1 run meets that release gate; later releases require a new run.

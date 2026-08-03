@@ -7,13 +7,14 @@ English · [简体中文](zh-CN/TESTING.md)
 ```bash
 python3 -m unittest discover -s tests -v
 python3 tests/test_release_assets.py
-python3 -m py_compile scripts/*.py skills/codex-custom-subagent/scripts/*.py
+python3 -m compileall -q scripts skills/codex-custom-subagents/scripts
 ```
 
 The suite covers configuration, manifest validation, selection and fallback,
 install ownership, protected uninstall, protocol conversion, SSE, the adapter
 service, atomic task claiming and recovery, session audits, and release assets.
-Python 3.9 skips release checks that require `tomllib`; CI uses Python 3.11.
+Python 3.9 skips release checks that require `tomllib`; CI uses Python 3.11 on
+both `macos-latest` and `windows-latest`.
 
 ## Installation checks
 

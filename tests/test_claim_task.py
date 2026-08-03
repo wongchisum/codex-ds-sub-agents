@@ -13,7 +13,7 @@ from tests.test_support import create_symlink_or_skip
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-subagent" / "scripts" / "claim_task.py"
+CLAIM_SCRIPT = PROJECT_ROOT / "skills" / "codex-custom-subagents" / "scripts" / "claim_task.py"
 HEADER = "# DeepSeek task handoff v1"
 
 

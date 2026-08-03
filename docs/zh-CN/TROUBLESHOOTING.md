@@ -23,7 +23,7 @@ Codex 任务在创建时加载 agent 注册表，当前任务不会热加载新�
 1. 完成 configure 和 doctor。
 2. 关闭执行安装的 Codex 任务。
 3. 新建 Codex 任务。
-4. 在新任务中读取 `subagent-selection.json` 并使用 `$codex-custom-subagent`。
+4. 在新任务中读取 `subagent-selection.json` 并使用 `$codex-custom-subagents`。
 
 不要把 `unknown agent_type` 分类成上游网络、计费或限流错误，也不要触发 fallback。
 

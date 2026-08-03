@@ -1,4 +1,0 @@
-interface:
-  display_name: "Codex Custom Subagents"
-  short_description: "Delegate Codex tasks to custom model workers"
-  default_prompt: "Use $codex-custom-subagent to split bounded work into a task pool and delegate it to the configured custom subagent model."

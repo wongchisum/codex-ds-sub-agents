@@ -7,10 +7,10 @@
 ```bash
 python3 -m unittest discover -s tests -v
 python3 tests/test_release_assets.py
-python3 -m py_compile scripts/*.py skills/codex-custom-subagent/scripts/*.py
+python3 -m compileall -q scripts skills/codex-custom-subagents/scripts
 ```
 
-测试覆盖统一配置入口、manifest 校验、selection/fallback、安装所有权、卸载保护、协议转换、SSE、adapter 服务、任务领取与恢复、session audit 和发布文件。配置入口测试会核对稳定 manifest 路径、0600 权限、共享凭证去重、安装失败传播，以及凭证缺失时不会提前安装或运行 doctor。Python 3.9 缺少 `tomllib` 时会跳过依赖 TOML 解析的发布测试；CI 使用 Python 3.11。
+测试覆盖统一配置入口、manifest 校验、selection/fallback、安装所有权、卸载保护、协议转换、SSE、adapter 服务、任务领取与恢复、session audit 和发布文件。配置入口测试会核对稳定 manifest 路径、0600 权限、共享凭证去重、安装失败传播，以及凭证缺失时不会提前安装或运行 doctor。Python 3.9 缺少 `tomllib` 时会跳过依赖 TOML 解析的发布测试；CI 使用 Python 3.11，并在 `macos-latest` 和 `windows-latest` 分别运行。
 
 ## 安装检查
 

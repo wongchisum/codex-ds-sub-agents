@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,11 +61,11 @@ class AdapterPathsTests(unittest.TestCase):
             runtime.os.environ, {"LOCALAPPDATA": r"C:\Users\alice\AppData\Local"}
         ):
             paths = runtime.adapter_paths(Path(r"C:\codex"))
-        self.assertEqual("C:/codex/adapters", paths.scripts_dir.as_posix())
-        self.assertEqual("C:/codex/logs/adapters", paths.logs_dir.as_posix())
+        self.assertEqual("C:/codex/adapters", PureWindowsPath(paths.scripts_dir).as_posix())
+        self.assertEqual("C:/codex/logs/adapters", PureWindowsPath(paths.logs_dir).as_posix())
         self.assertEqual(
             "C:/Users/alice/AppData/Local/Codex/SubagentAdapters",
-            paths.definitions_dir.as_posix(),
+            PureWindowsPath(paths.definitions_dir).as_posix(),
         )
 
     def test_posix_paths_keep_launch_agents(self) -> None:

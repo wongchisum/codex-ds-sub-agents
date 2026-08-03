@@ -10,7 +10,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_SCRIPTS = ROOT / "skills" / "codex-custom-subagent" / "scripts"
+SKILL_SCRIPTS = ROOT / "skills" / "codex-custom-subagents" / "scripts"
 sys.path.insert(0, str(SKILL_SCRIPTS))
 MODULE_PATH = SKILL_SCRIPTS / "delegation_runtime.py"
 SPEC = importlib.util.spec_from_file_location("delegation_runtime", MODULE_PATH)

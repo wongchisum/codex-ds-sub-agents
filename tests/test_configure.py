@@ -294,7 +294,7 @@ class ConfigureTests(unittest.TestCase):
             self.assertIn("doctor.py", calls[1][1])
             self.assertIn("start a NEW Codex task", output.getvalue())
             self.assertIn("unknown agent_type", output.getvalue())
-            self.assertIn("$codex-custom-subagent", output.getvalue())
+            self.assertIn("$codex-custom-subagents", output.getvalue())
 
     def test_skip_doctor_still_requires_a_new_task(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -1,4 +1,4 @@
-"""Migration tests for predecessor skill names → `codex-custom-subagent`."""
+"""Migration tests for predecessor skill names → `codex-custom-subagents`."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ class MigrateSkillTests(unittest.TestCase):
                 current_skill = codex_home / "skills" / NEW_SKILL / "SKILL.md"
                 self.assertTrue(current_skill.is_file())
                 self.assertIn(
-                    "name: codex-custom-subagent",
+                    "name: codex-custom-subagents",
                     current_skill.read_text(encoding="utf-8"),
                 )
 

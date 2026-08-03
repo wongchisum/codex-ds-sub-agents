@@ -32,7 +32,7 @@ The installer writes runtime files under `CODEX_HOME`, which defaults to `~/.cod
 ~/.codex/
 ├── agents/                              # worker definitions
 ├── models/                              # catalogs and subagent-selection.json
-├── skills/codex-custom-subagent/        # $codex-custom-subagent
+├── skills/codex-custom-subagents/        # $codex-custom-subagents
 ├── adapters/                            # Anthropic Messages adapter
 ├── logs/adapters/                       # adapter logs and structural audit
 ├── logs/custom-subagents/               # redacted configure logs

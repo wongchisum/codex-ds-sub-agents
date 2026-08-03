@@ -37,9 +37,9 @@ flowchart LR
 | `scripts/anthropic_responses_adapter.py` | Expose a local Responses HTTP/SSE service backed by Anthropic Messages |
 | `scripts/anthropic_adapter_protocol.py` | Convert messages, tools, results, errors, and stream events |
 | `scripts/model_selection.py` | Validate selection and classify switch-eligible failures |
-| `skills/codex-custom-subagent/scripts/delegation_runtime.py` | Persist active model, failure, generation, and fallback state |
-| `skills/codex-custom-subagent/scripts/claim_task.py` | Atomically claim, complete, fail, locate, and recover tasks |
-| `skills/codex-custom-subagent/scripts/platform_lock.py` | Provide POSIX `fcntl` and Windows `msvcrt` mailbox locking |
+| `skills/codex-custom-subagents/scripts/delegation_runtime.py` | Persist active model, failure, generation, and fallback state |
+| `skills/codex-custom-subagents/scripts/claim_task.py` | Atomically claim, complete, fail, locate, and recover tasks |
+| `skills/codex-custom-subagents/scripts/platform_lock.py` | Provide POSIX `fcntl` and Windows `msvcrt` mailbox locking |
 | `scripts/platform_runtime.py` | Resolve platform-aware Python commands, Codex executable, service paths, and quoting |
 | `scripts/session_audit.py` | Verify actual agent, model, context window, follow-ups, and errors from a rollout |
 

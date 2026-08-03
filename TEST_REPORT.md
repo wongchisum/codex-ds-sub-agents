@@ -1,7 +1,7 @@
 # Codex Custom Subagents test report
 
-Date: 2026-08-02
-Environment: macOS, Python 3.9.6 and 3.13, Codex CLI 0.146.0-alpha.9.2
+Date: 2026-08-03
+Environment: macOS, Python 3.9.6 and 3.13, Codex CLI 0.146.0-alpha.9.2; Windows real-machine flow reported passing by the maintainer
 
 No API credential is stored in this repository, generated config, task pool, or
 test output.
@@ -31,7 +31,8 @@ test output.
   manifest, stores a stable 0600 copy, checks credential references before
   installation, and runs doctor when credentials are available.
 - Cross-platform runtime paths include macOS LaunchAgent/Keychain and Windows
-  Task Scheduler/Credential Manager. Windows branches have simulated tests only.
+  Task Scheduler/Credential Manager. The PR #1 Windows real-machine checklist
+  passed on 2026-08-03, and CI now covers both macOS and Windows runners.
 - Configure phases, adapter audit/output tails, mailbox receipts, and runtime
   state can be exported in a bounded redacted diagnostic bundle.
 - Skill packaging ignores interpreter/OS caches and copies valid binary assets
@@ -47,10 +48,10 @@ test output.
 | Custom install and doctor | PASS | isolated Codex home, strict config loaded |
 | Windows platform simulation | PASS | win32 import, Task Scheduler XML/lifecycle mocks, `msvcrt` lock dispatch, dynamic Python/path rendering |
 | Credential and diagnostics | PASS | native-store boundary, configure JSONL redaction, bounded diagnostic zip with task/config exclusions |
-| Full automated suite | PASS | 301 passed on Python 3.13; Python 3.9 passed 298 and skipped 3 TOML checks |
+| Full automated suite | PASS | Python 3.13 ran 305 tests; Python 3.9 ran 305 tests with 3 TOML checks skipped |
 | Python compilation | PASS | bytecode cache redirected to `/private/tmp` |
 
-The plugin manifest and `$codex-custom-subagent` Skill were also validated with
+The plugin manifest and `$codex-custom-subagents` Skill were also validated with
 their Codex validators after the project rename. This report retains older
 endpoint and session evidence below; historical local paths are evidence, not
 current product names.

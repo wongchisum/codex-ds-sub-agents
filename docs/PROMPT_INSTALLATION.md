@@ -32,7 +32,7 @@ https://github.com/wongchisum/codex-custom-subagents
    doctor. Report success only when doctor passes.
 10. Tell me to close this Codex task and start a new task because open tasks do
     not hot-load newly installed agent types.
-11. In the new task, use $codex-custom-subagent. Do not use any legacy
+11. In the new task, use $codex-custom-subagents. Do not use any legacy
     skill name.
 12. Do not print, copy, commit, upload, or otherwise expose credential values.
 ```

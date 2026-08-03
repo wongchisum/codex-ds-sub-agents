@@ -38,8 +38,8 @@ flowchart LR
 | `scripts/anthropic_adapter_protocol.py` | 转换消息、工具、结果、错误和流事件 |
 | `scripts/model_selection.py` | selection 数据结构与可切换错误分类 |
 | `scripts/delegation_runtime.py` | 持久化每次运行的 active model、失败和 fallback generation |
-| `skills/codex-custom-subagent/scripts/claim_task.py` | 原子领取、完成、失败、定位和恢复任务 |
-| `skills/codex-custom-subagent/scripts/platform_lock.py` | POSIX fcntl / Windows msvcrt 字节范围文件锁抽象 |
+| `skills/codex-custom-subagents/scripts/claim_task.py` | 原子领取、完成、失败、定位和恢复任务 |
+| `skills/codex-custom-subagents/scripts/platform_lock.py` | POSIX fcntl / Windows msvcrt 字节范围文件锁抽象 |
 | `scripts/platform_runtime.py` | 平台感知的 Python 命令、Codex 发现、服务路径与命令构造 |
 | `scripts/session_audit.py` | 从原生 rollout 核验实际 agent、模型、窗口与结果 |
 

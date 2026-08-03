@@ -21,7 +21,7 @@ Codex loads the agent registry when a task starts. Doctor cannot hot-load a newl
 1. Finish configure and doctor.
 2. Close the task that performed the installation.
 3. Start a new Codex task.
-4. Read `subagent-selection.json` and use `$codex-custom-subagent`.
+4. Read `subagent-selection.json` and use `$codex-custom-subagents`.
 
 Do not classify `unknown agent_type` as a network, billing, or rate-limit failure, and do not switch to a fallback.
 
